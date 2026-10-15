@@ -15,7 +15,7 @@ The workshop presentation is available at https://app.jxke.co/affective-sensing/
 4. How training works
 5. Interactive face mesh and photo UV exercise
 6. Understanding emotion through machines
-7. P5JS + ML5.js Integration, with an expression log
+7. P5JS + ML5.js Integration, with live face tracking
 8. Define classes in Teachable Machine
 9. Collect examples, train and test
 10. Export the model
@@ -41,23 +41,23 @@ Open:
 
 Use Chrome or Edge and explicitly allow the camera. Model downloads need internet access. Both examples pin p5.js **1.11.3**. The trainable example pins ml5.js **0.12.2**. The expression example uses the same expression-enabled ml5 teaching build (`ml5js/Intro-ML-Arts-IMA@ml5-build-10-7-19`) as Jake’s original sketch. The standard ml5 0.12.2 FaceAPI wrapper omits expression support, so these two examples intentionally use different builds. Libraries load from jsDelivr. Do not replace it with latest without migrating both sketches. No npm installation is required.
 
-Camera images and training examples stay in browser memory. Refreshing clears the optional ml5 training exercise. The live event log keeps only labels, timestamps and scores in sessionStorage for the current tab. It survives refreshes and slide changes until reset or the browser session ends. Download CSV to keep a copy. Only numeric scores and a label are sent if you explicitly connect to the local TouchDesigner receiver. Stop the camera when done.
+Camera images, photo textures, and captured comparison examples stay in browser memory. Refreshing clears them. No expression entries are recorded. Stop the camera when done. The expression demo can optionally send numeric scores and labels to the local TouchDesigner receiver.
 
 ## 1. Observe a pretrained model
 
 Start the camera in `p5-expression`. FaceAPI returns seven expression scores. Try changing your pose, lighting, or expression. Move out of frame and observe the scores clear. This is inference with an already-trained model.
 
-Simplified from [Jake’s original p5.js sketch](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): removes serial/Arduino, face descriptors, landmarks, and overlay drawing, retaining the camera, expression scores, and optional TouchDesigner connection.
+Simplified from [Jake’s original p5.js sketch](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): removes serial/Arduino, face descriptors and landmark drawing. The workshop version adds a tracked face square with a live expression label.
 
-To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.html`, and the shared `style.css`, `bridge.js`, `expression-log.js` and `live-ui.js`. Put them in the sketch root and change all `../shared/` references in the HTML to `./`. The sketches use p5 global mode and are also editable directly here.
+To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.html`, its `presenter.css`, and the shared `bridge.js` and `live-ui.js`. Put them in the sketch root and change all `../shared/` references in the HTML to `./`. The sketches use p5 global mode and are also editable directly here.
 
 ## 2. Teachable Machine to p5.js
 
-Follow [the Teachable Machine guide](resources/teachable-p5/README.md). It walks through naming image classes, collecting examples, training, testing and exporting a model, then loading that model into p5.js. `starter-sketch.js` is the minimal editable integration. The full example at `resources/teachable-p5/index.html` also includes logging.
+Follow [the Teachable Machine guide](resources/teachable-p5/README.md). The [complete minimal sketch](resources/teachable-p5/minimal-sketch.md) loads its model libraries automatically and can be copied directly into sketch.js in the p5 editor.
 
-The pretrained expression demo and your model demo both run inside the slides. Start the camera explicitly. The active camera and session counter continue across slides, and Stop controls remain in each live example. Starting the other demo stops the first camera. Each model has a separate session log.
+The presentation keeps one camera feed alive. It is large on slides 7 and 12, and moves to the bottom-left corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
 
-A label must reach a score of at least 60% for 0.5 seconds to count. It counts once while held. Leave it for 0.4 seconds before repeating. Neutral is included by default in the pretrained demo. Use the selector to exclude a class if desired. Consecutive predictions can be slow without preventing a count. These are counted model detections, not verified internal emotions. A model can misclassify you or another visible person.
+Slide 9 offers three comparison captures: empty room, person at rest, and person performing an expression. Each capture has a three-second countdown. Images remain in memory on the page.
 
 The GitHub QR code appears beside the discussion slide resources, on the final slide and in the resource panel. Its target is https://github.com/Critical-Matter-MIT-Media-Lab/MAS.S63-Workshop-Emotion.
 
@@ -65,7 +65,7 @@ The GitHub QR code appears beside the discussion slide resources, on the final s
 
 Open the face-mesh slide or `resources/face-lab/index.html`. Drag to rotate the canonical 468-vertex face, or start the camera and take a picture. You can also select an image file. MediaPipe finds the landmarks, and the photograph becomes the UV texture of the resulting 3D mesh. Images stay in browser memory.
 
-Move the smile, jaw and brow sliders to deform the geometry. Press **Re-read expression** to pass a stable front view of the textured mesh through the expression classifier. The displayed scores are actual model outputs. A large deformation can result in no detected face. The sliders illustrate changes in appearance and do not retrain the model or establish someone's internal feelings.
+Choose one of the expression classifier’s own labels to apply an approximate shape preset, or fine-tune the smile, jaw and brow sliders. The inner-lip triangles are removed to form an actual mouth opening with a dark interior. Press **Re-read expression** to pass a stable front view of the textured mesh through the expression classifier. The displayed scores are actual model outputs. A large deformation can result in no detected face. The sliders illustrate changes in appearance and do not retrain the model or establish someone's internal feelings.
 
 The mesh is a separate geometric representation. The expression classifier reads the rendered pixels. The slide deck shares a preloaded ml5 expression runtime with this exercise. The standalone lab loads its own hidden expression runtime.
 
@@ -86,7 +86,7 @@ Discussion: What exactly did you label? Which examples failed? Did your backgrou
 
 ## 3. TouchDesigner
 
-Follow [the minimal receiver guide](resources/touchdesigner/README.md). It creates an isolated receiver from a short Python setup script and callbacks. Both p5 examples can send labels and scores to it. Add a DAT to CHOP and use a score to control a color.
+Follow [the minimal receiver guide](resources/touchdesigner/README.md). It creates an isolated receiver from a short Python setup script and callbacks. The pretrained expression demo and optional ml5 training sketch can send labels and scores to it. Add a DAT to CHOP and use a score to control a color.
 
 This follows the browser-to-WebSocket-to-DAT approach in Jake’s `ml5-touchdesigner` project, with one mode and a small numeric table. It does not modify or require that larger project. Source scripts are included instead of an unverified `.tox` export.
 

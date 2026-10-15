@@ -15,3 +15,7 @@ MediaPipe canonical geometry: https://github.com/google-ai-edge/mediapipe/tree/m
 Face Landmarker guide: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js
 
 MediaPipe data and model are Apache 2.0 licensed. See MEDIAPIPE-LICENSE. Three.js is MIT licensed: https://github.com/mrdoob/three.js/blob/dev/LICENSE
+
+## Expression presets and mouth geometry
+
+The buttons use labels exported by the preloaded expression classifier. They apply approximate geometric presets, not inversions learned from the classifier. With a photo mapped, a preset requests an actual classifier reading of the frontal rendering. Fine adjustments remain available. The 18 triangles covering the inner lips are removed, leaving a mouth aperture with a dark interior behind it.

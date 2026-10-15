@@ -16,6 +16,7 @@ const light = new THREE.DirectionalLight(0xffffff,2); light.position.set(1,2,5);
 const geometry = new THREE.BufferGeometry();
 const material = new THREE.MeshBasicMaterial({color:0xe5e5e5,side:THREE.DoubleSide});
 const mesh = new THREE.Mesh(geometry,material); scene.add(mesh);
+const cavity = new THREE.Mesh(new THREE.SphereGeometry(1,32,20),new THREE.MeshBasicMaterial({color:0x180b0e})); mesh.add(cavity);
 const wire = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x444444,wireframe:true,transparent:true,opacity:.45,depthWrite:false})); scene.add(wire);
 let basePositions, photoTexture, landmarker, landmarkPromise, stream, hasPhoto = false, cameraToken = 0, requestNumber = 0;
 const pendingReads = new Map();
@@ -34,9 +35,13 @@ function setPositions(positions) {
   geometry.setAttribute('position',new THREE.BufferAttribute(basePositions.slice(),3)); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
 }
 const topology = await (await fetch('canonical-face.json')).json();
-geometry.setIndex(topology.indices); geometry.setAttribute('uv',new THREE.Float32BufferAttribute(topology.uv.flat(),2));
-setPositions(topology.positions); mesh.rotation.y = wire.rotation.y = -.18; resize();
-status('468 landmarks / 898 triangles. Rotate the mesh, or take a picture to map your face onto it.');
+// Remove the triangles spanning the inner lips, leaving a real mouth aperture.
+const innerLips = new Set([78,95,88,178,87,14,317,402,318,324,308,415,310,311,312,13,82,81,80,191]);
+const openIndices = [];
+for (let i=0;i<topology.indices.length;i+=3) { const triangle = topology.indices.slice(i,i+3); if (!triangle.every(v => innerLips.has(v))) openIndices.push(...triangle); }
+geometry.setIndex(openIndices); geometry.setAttribute('uv',new THREE.Float32BufferAttribute(topology.uv.flat(),2));
+setPositions(topology.positions); deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
+status('468 landmarks / 880 triangles / open inner lips. Rotate the mesh, or take a picture to map your face onto it.');
 
 async function ensureLandmarker() {
   if (landmarker) return landmarker;
@@ -48,7 +53,7 @@ async function ensureLandmarker() {
   })().catch(error => { landmarkPromise = null; throw error; });
   return landmarkPromise;
 }
-function publishCamera(running) { if (parent !== window) parent.postMessage({type:'affective-live-state',running,total:0,counts:{}},location.origin); }
+function publishCamera(running) { if (parent !== window) parent.postMessage({type:'affective-live-state',running},location.origin); }
 async function startCamera() {
   const token = ++cameraToken; $('#camera-start').disabled = true; $('#camera-stop').disabled = false;
   try {
@@ -104,9 +109,14 @@ function deform() {
     const corners = gaussian(x,y,left,1.3)+gaussian(x,y,right,1.3);
     const jawWeight = THREE.MathUtils.clamp((mouth[1]-y+1)/5,0,1)*Math.exp(-(((x-mouth[0])/6)**2));
     y += smile*.95*corners + brow*.9*(gaussian(x,y,browL,1.5)+gaussian(x,y,browR,1.5)) - jaw*2*jawWeight;
+    if (innerLips.has(i)) { const upper = [13,82,81,80,191,312,311,310,415].includes(i); y += upper ? jaw*.3 : -jaw*.65; }
     x += smile*.2*Math.sign(x-mouth[0])*corners; z -= jaw*.3*jawWeight;
     attr.setXYZ(i,x,y,z);
   }
+  const a = new THREE.Vector3().fromBufferAttribute(attr,13), b = new THREE.Vector3().fromBufferAttribute(attr,14);
+  const l = new THREE.Vector3().fromBufferAttribute(attr,78), r = new THREE.Vector3().fromBufferAttribute(attr,308);
+  cavity.position.copy(a).add(b).multiplyScalar(.5); cavity.position.z -= .45;
+  cavity.scale.set(Math.max(.3,l.distanceTo(r)*.55),Math.max(.12,a.distanceTo(b)*.65),.6);
   attr.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   $('#reading').textContent = hasPhoto ? 'Geometry changed. Press Re-read expression to measure it.' : 'Take a picture to compare model scores.';
 }
@@ -142,6 +152,7 @@ async function readExpression() {
 }
 window.addEventListener('message',event => {
   if (event.origin !== location.origin || (event.source !== parent && event.source !== localEngine?.contentWindow)) return;
+  if (event.data?.type === 'affective-model-labels') renderPresets(event.data.labels);
   if (event.data?.type === 'affective-stop') stopCamera();
   if (event.data?.type === 'affective-expression-result') {
     const pending = pendingReads.get(event.data.id); if (!pending) return;
@@ -164,3 +175,16 @@ $('#wire').addEventListener('change',() => wire.visible = $('#wire').checked);
 $('#texture').addEventListener('change',() => { material.map = $('#texture').checked ? photoTexture : null; material.color.set(material.map ? 0xffffff : 0xe5e5e5); material.needsUpdate = true; });
 window.addEventListener('pagehide',() => { stopCamera(); landmarker?.close(); renderer.dispose(); photoTexture?.dispose(); });
 document.addEventListener('keydown',event => { if (parent !== window && !event.target.closest('input,button,select') && ['ArrowLeft','ArrowRight'].includes(event.key)) { event.preventDefault(); parent.postMessage({type:'affective-nav',direction:event.key === 'ArrowRight' ? 'next' : 'previous'},location.origin); } });
+
+const shapes = {neutral:[0,0,0],happy:[1,.18,.2],sad:[-.8,.03,.55],angry:[-.35,.08,-.9],fearful:[-.2,.65,.9],disgusted:[-.65,.18,-.4],surprised:[0,1,1]};
+let presetTimer;
+function renderPresets(labels) {
+  $('#presets').replaceChildren();
+  labels.filter(label => shapes[label]).forEach(label => {
+    const button = document.createElement('button'); button.textContent = label;button.type = 'button';button.setAttribute('aria-pressed','false');
+    button.onclick = () => { $('#presets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed',String(b===button)));['#smile','#jaw','#brow'].forEach((id,i) => $(id).value = shapes[label][i]);deform();clearTimeout(presetTimer);if (hasPhoto) presetTimer = setTimeout(() => { if (!$('#read').disabled) readExpression(); },250); };
+    $('#presets').append(button);
+  });
+}
+// Populate from the classifier's exported label list, including standalone mode.
+const labelEngine = await engineTarget();labelEngine.postMessage({type:'affective-labels-request'},location.origin);
