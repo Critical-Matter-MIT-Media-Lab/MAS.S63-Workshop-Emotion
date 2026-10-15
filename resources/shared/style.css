@@ -5,3 +5,5 @@
 .teachable #camera,.teachable.embedded #camera{aspect-ratio:1;width:100%;max-width:360px}
 
 .embedded:not(.teachable) #camera{max-width:480px;width:100%;aspect-ratio:4/3}.embedded #scores{display:none}
+
+.embedded>.controls button{font-size:11px;padding:6px 10px}.embedded>.controls{margin:2px 0 8px;gap:8px}.embedded #model-state{margin:4px 0;font-size:10px}.embedded #log-status{min-height:28px;font-size:10px}.embedded #tally>div{padding:4px 0}.embedded .live-counts .note{line-height:1.4}.embedded .live-counts .ignored-label{margin-top:8px}.embedded .live-counts .tally-total{margin-top:10px}

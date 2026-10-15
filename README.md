@@ -10,16 +10,18 @@ A workshop about defining emotion, training a model, and questioning what it lea
 The workshop presentation is available at https://app.jxke.co/affective-sensing/. Its editable web source lives in the JXKE applications repository.
 
 1. Affective Sensing
-2. Workshop overview: train your own model, then test it
-3. Emotion as a suitcase term, and the thinking, memory, pleasure and pain it contains
-4. Understanding these ideas through how machines understand emotions
-5. Live p5.js / ml5.js expression viewer and session counter
-6. Define classes in Teachable Machine
-7. Collect examples, train, and test
-8. Export a TensorFlow.js model and copy its URL
-9. Integrate the model into p5.js
-10. Run your own model live in p5.js, with a session log
-11. Workshop resources and GitHub QR code
+2. How Do Machines see Emotion?
+3. Emotion as a suitcase term
+4. How training works
+5. Interactive face mesh and photo UV exercise
+6. Understanding emotion through machines
+7. P5JS + ML5.js Integration, with an expression log
+8. Define classes in Teachable Machine
+9. Collect examples, train and test
+10. Export the model
+11. Integrate it into p5.js
+12. Run your own model live
+13. Workshop resources
 
 Use Left/Right arrows, Home/End, or the on-screen controls. Press F for fullscreen. The resource panel contains live examples and a download of this kit. Printing produces the full presentation.
 
@@ -53,11 +55,21 @@ To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.htm
 
 Follow [the Teachable Machine guide](resources/teachable-p5/README.md). It walks through naming image classes, collecting examples, training, testing and exporting a model, then loading that model into p5.js. `starter-sketch.js` is the minimal editable integration. The full example at `resources/teachable-p5/index.html` also includes logging.
 
-The pretrained expression demo and your model demo both run inside the slides. Start the camera explicitly. The active camera and session counter continue across slides, and a Stop control remains in the deck footer. Starting the other demo stops the first camera. Each model has a separate session log.
+The pretrained expression demo and your model demo both run inside the slides. Start the camera explicitly. The active camera and session counter continue across slides, and Stop controls remain in each live example. Starting the other demo stops the first camera. Each model has a separate session log.
 
-A label must reach a score of at least 75% for 0.8 seconds to count. It counts once while held. Leave it for 0.6 seconds before repeating. Neutral does not count in the pretrained demo. Choose the background/neutral class in your custom model's selector to exclude it. These are counted model detections, not verified internal emotions. A model can misclassify you or another visible person.
+A label must reach a score of at least 60% for 0.5 seconds to count. It counts once while held. Leave it for 0.4 seconds before repeating. Neutral is included by default in the pretrained demo. Use the selector to exclude a class if desired. Consecutive predictions can be slow without preventing a count. These are counted model detections, not verified internal emotions. A model can misclassify you or another visible person.
 
-The GitHub QR code appears on the final slide and below the workshop resource links. Its target is https://github.com/Critical-Matter-MIT-Media-Lab/MAS.S63-Workshop-Emotion.
+The GitHub QR code appears beside the discussion slide resources, on the final slide and in the resource panel. Its target is https://github.com/Critical-Matter-MIT-Media-Lab/MAS.S63-Workshop-Emotion.
+
+## Face mesh exercise
+
+Open the face-mesh slide or `resources/face-lab/index.html`. Drag to rotate the canonical 468-vertex face, or start the camera and take a picture. You can also select an image file. MediaPipe finds the landmarks, and the photograph becomes the UV texture of the resulting 3D mesh. Images stay in browser memory.
+
+Move the smile, jaw and brow sliders to deform the geometry. Press **Re-read expression** to pass a stable front view of the textured mesh through the expression classifier. The displayed scores are actual model outputs. A large deformation can result in no detected face. The sliders illustrate changes in appearance and do not retrain the model or establish someone's internal feelings.
+
+The mesh is a separate geometric representation. The expression classifier reads the rendered pixels. The slide deck shares a preloaded ml5 expression runtime with this exercise. The standalone lab loads its own hidden expression runtime.
+
+Canonical geometry and the landmark model are from Google's MediaPipe project. See the included `MEDIAPIPE-LICENSE` and [face lab guide](resources/face-lab/README.md).
 
 ## Optional: train inside ml5.js
 

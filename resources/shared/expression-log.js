@@ -1,7 +1,7 @@
 // Count sustained label entries, rather than every prediction frame.
 // Pure update logic is shared by the pretrained and Teachable Machine demos.
 class ExpressionLog {
-  constructor({key = 'affective-expression-log', ignored = ['neutral'], threshold = 0.75, holdMs = 800, releaseMs = 600} = {}) {
+  constructor({key = 'affective-expression-log', ignored = [], threshold = 0.6, holdMs = 500, releaseMs = 400} = {}) {
     Object.assign(this, {key, ignored, threshold, holdMs, releaseMs});
     this.events = [];
     try { const saved = JSON.parse(sessionStorage.getItem(key)); if (Array.isArray(saved)) this.events = saved.filter(e => typeof e.label === 'string' && typeof e.time === 'string' && Number.isFinite(e.score)); } catch {}
@@ -9,7 +9,8 @@ class ExpressionLog {
   }
   resetTracking() { this.candidate = ''; this.since = 0; this.active = ''; this.releaseSince = null; this.lastUpdate = null; }
   update(predictions, now = Date.now()) {
-    if (this.lastUpdate !== null && now - this.lastUpdate > 2500) this.resetTracking();
+    // Inference can be slow. Consecutive observations still establish a label.
+    // Camera stop and sustained missing/low-confidence results reset tracking.
     this.lastUpdate = now;
     const top = predictions.reduce((best, p) => p.score > (best?.score ?? -1) ? p : best, null);
     const label = top && top.score >= this.threshold && !this.ignored.includes(top.label) ? top.label : '';

@@ -21,7 +21,15 @@ function publishLiveState() {
   if (window.parent !== window) window.parent.postMessage({type:'affective-live-state', running:liveRunning, total:eventLog.events.length, counts:eventLog.counts()}, location.origin);
 }
 function setLiveRunning(value) { liveRunning = value; if (!value) eventLog.resetTracking(); publishLiveState(); }
-function logPredictions(predictions) { const event = eventLog.update(predictions); if (event) renderLog(); }
+function logPredictions(predictions) {
+  const event = eventLog.update(predictions);
+  const status = document.querySelector('#log-status');
+  if (status) {
+    const top = predictions.reduce((best,p) => p.score > (best?.score ?? -1) ? p : best, null);
+    status.textContent = !top ? 'Waiting for a face.' : event ? 'Recorded: '+event.label : eventLog.ignored.includes(top.label) ? top.label+' is excluded.' : top.score < eventLog.threshold ? 'Waiting for a score of at least '+Math.round(eventLog.threshold*100)+'%.' : eventLog.active === top.label ? top.label+' is counted. Change expression to record another entry.' : 'Holding '+top.label+'…';
+  }
+  if (event) renderLog();
+}
 document.querySelector('#reset-log').addEventListener('click', () => { eventLog.reset(); renderLog(); });
 document.querySelector('#download-log').addEventListener('click', () => eventLog.download());
 window.addEventListener('message', event => {

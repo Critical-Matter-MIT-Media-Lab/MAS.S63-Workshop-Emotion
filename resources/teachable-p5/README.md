@@ -14,9 +14,9 @@
 
 On the **Your model, live in p5.js** slide, paste the URL and press **Load model**. Press **Start camera + log** when ready. Choose your neutral/background label in the re-arm selector. Labels and counts come from your model, not a hardcoded list. There is no supplied trained participant model or fake live result.
 
-The p5 canvas mirrors and crops the camera to a square to match Teachable Machine. The model reads only that image; prediction labels and the counter sit outside the image. The log counts a label after a score of at least 75% for 0.8 seconds. Leave it for 0.6 seconds before repeating. A sustained label counts once. Neutral/background can re-arm the counter without adding a count.
+The p5 canvas mirrors and crops the camera to a square to match Teachable Machine. The model reads only that image; prediction labels and the counter sit outside the image. The log counts a label after a score of at least 60% for 0.5 seconds. Leave it for 0.4 seconds before repeating. A sustained label counts once. Neutral/background can re-arm the counter without adding a count.
 
-Camera and log continue across slide changes until you press Stop. The deck footer shows the number of entries and provides a Stop button. Logs survive a refresh in the same browser tab. **Download CSV** exports timestamps, labels and model scores. **Reset log** clears the current model's log. Images are never recorded by this sketch. Models have separate logs.
+Camera and log continue across slide changes until you press Stop. Use the Stop button inside the active example to end camera access. Logs survive a refresh in the same browser tab. **Download CSV** exports timestamps, labels and model scores. **Reset log** clears the current model's log. Images are never recorded by this sketch. Models have separate logs.
 
 ## Put it in your own p5.js project
 
