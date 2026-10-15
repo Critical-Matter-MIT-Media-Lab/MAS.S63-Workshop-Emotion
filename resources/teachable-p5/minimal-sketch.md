@@ -13,6 +13,8 @@ The canvas begins at **640 × 480** and adjusts to your camera's actual aspect r
 
 The preview, controls and result label sit inside a compact light card with explicit text/background colors, so the class and percentage remain readable in dark editor themes. The card scales to the available width.
 
+The webcam preview also caps its height to keep the result and controls visible in a smaller editor preview.
+
 ```javascript
 // ML5 Model Loader Sketch / custom Teachable Machine image models.
 // In the p5 editor, replace all of sketch.js with this file.
@@ -23,7 +25,7 @@ const modelInput = document.createElement('canvas');
 modelInput.width = modelInput.height = 224;
 function setup() {
   const style = document.createElement('style');
-  style.textContent = `#affective-loader{font:14px/1.4 Arial,sans-serif;color:#171717;background:#fff;border:1px solid #d6d6d6;border-radius:10px;overflow:hidden;width:min(640px,calc(100vw - 32px));margin:16px;box-sizing:border-box}#affective-loader canvas{display:block;width:100%!important;height:auto!important}#affective-loader .loader-toolbar{padding:12px 14px;display:flex;gap:8px;align-items:center;background:#f6f6f6}#affective-loader button{font:12px Arial,sans-serif;color:#171717;background:#fff;border:1px solid #bbb;border-radius:5px;padding:7px 10px;cursor:pointer}#affective-loader .loader-readout{color:#171717!important;background:#fff!important;font-size:16px;font-weight:600;padding:14px 16px;margin:0;min-height:48px;overflow-wrap:anywhere;box-sizing:border-box}#affective-loader .loader-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#555;padding:12px 16px;margin:0;border-bottom:1px solid #ddd}`;
+  style.textContent = `#affective-loader{font:14px/1.4 Arial,sans-serif;color:#171717;background:#fff;border:1px solid #d6d6d6;border-radius:10px;overflow:hidden;width:min(640px,calc(100% - 32px));margin:16px;box-sizing:border-box}#affective-loader canvas{display:block;width:100%!important;height:auto!important;max-height:calc(100dvh - 210px);object-fit:contain;background:#eee}#affective-loader .loader-toolbar{padding:12px 14px;display:flex;gap:8px;align-items:center;background:#f6f6f6}#affective-loader button{font:12px Arial,sans-serif;color:#171717;background:#fff;border:1px solid #bbb;border-radius:5px;padding:7px 10px;cursor:pointer}#affective-loader .loader-readout{color:#171717!important;background:#fff!important;font-size:16px;font-weight:600;padding:14px 16px;margin:0;min-height:48px;overflow-wrap:anywhere;box-sizing:border-box}#affective-loader .loader-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#555;padding:12px 16px;margin:0;border-bottom:1px solid #ddd}`;
   document.head.append(style);
   const shell = createDiv().id('affective-loader');
   createP('Your image model / live webcam').class('loader-heading').parent(shell);
