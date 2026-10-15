@@ -18,7 +18,7 @@ function ensureModel() {
   document.querySelector('#model-state').textContent = 'Preloading expression model…';
   modelPromise = Promise.resolve().then(() => {
     if (!window.ml5) throw new Error('ml5.js could not load.');
-    return ml5.faceApi({withLandmarks:false,withDescriptors:false,withExpressions:true,minConfidence:0.5});
+    return ml5.faceApi({withLandmarks:false,withDescriptors:false,withExpressions:true,minConfidence:0.5,Mobilenetv1Model:new URL('models/ssd_mobilenetv1_model-weights_manifest.json',location.href).href,FaceLandmarkModel:new URL('models/face_landmark_68_model-weights_manifest.json',location.href).href,FaceRecognitionModel:new URL('models/face_recognition_model-weights_manifest.json',location.href).href,FaceExpressionModel:new URL('models/face_expression_model-weights_manifest.json',location.href).href});
   }).then(model => {
     faceapi = model;
     if (Array.isArray(model.model.FACE_EXPRESSION_LABELS)) names = [...model.model.FACE_EXPRESSION_LABELS];

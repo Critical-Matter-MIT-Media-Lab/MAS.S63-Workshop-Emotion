@@ -24,11 +24,13 @@ The buttons use labels exported by the preloaded expression classifier. They app
 
 The label buttons choose approximate shapes. They do not assign the classifier result. The model-input thumbnail shows the exact frontal image sent to the classifier, with the wire overlay removed. Scores are unmodified model outputs.
 
-Fit target tests preset strengths and small changes to each of the six controls. It retains changes only when they increase the selected label's actual score for this photograph. This optimizes agreement with this classifier, not emotional truth. It may still classify a target as neutral or another label.
+Fit target measures preset strengths, individual controls, coordinated movements and a population of candidate poses against the unchanged classifier. It retains the highest measured target score among candidates with a detected face. This optimizes agreement with this classifier, not emotional truth. It may still classify a target as neutral or another label.
 
 A photograph retains its original mouth appearance, eye texture, and lighting as the geometry moves. Consequently a smiling photograph can still read as happy after an angry preset, and a neutral photograph can remain neutral after a small edit. Start from a clear, evenly lit frontal photo. The classifier reads the rendered pixels; it does not know which preset was selected and was not trained specifically on these synthetic mesh edits.
 
-The lab fits inside its slide, with compact controls and no internal page scrolling at the supported desktop presentation sizes.
+The lab fits inside its slide. Twenty-three controls are grouped into Mouth, Brows, Eyes, Nose and Reference tabs. These include independent inner/outer brows, brow angle, eyelid aperture, cheek lift, upper/lower lip movement, lip pressure, pucker, teeth reveal, one-sided sneer, nose wrinkles, chin raise, source-pose normalization, eye-surface reconstruction, perspective, skin-detail normalization and surface lighting. Source normalization blends detected landmarks toward an aligned neutral reference. The eye reconstruction and teeth are illustrative surfaces, rather than recovered anatomy. Skin normalization blends a blurred version of the same photograph locally; no replacement face image is used.
+
+The original expression model weights and teaching runtimes are bundled in the workshop. The model files are checked against the upstream repository's Git blob hashes; see `../p5-expression/models/SOURCE.md`. No weights or output scores are modified. Three.js and the MediaPipe runtime still require a network connection.
 
 The sad preset uses a smaller, localized mouth-corner movement. Angry combines brow lowering/furrowing and lip tension; disgusted adds localized nose and upper-lip movement with chin lift. Fearful combines inner-brow motion, wider eyelids and horizontal mouth stretch. If a selected preset loses face detection, the lab tests reduced strengths to restore it. Scores still come from the unchanged classifier; selecting a preset never forces its output label.
 
@@ -37,5 +39,7 @@ Weak sad, angry, fearful and disgusted presets automatically run the same measur
 ## Measurement queue and unsuccessful fits
 
 Every selected preset now waits for the preceding measurement; a newer selection cancels an older fit. Old scores clear immediately when geometry changes. The fitting search includes the current pose, the undeformed photo mesh, five preset strengths, the six visible controls, and coordinated inner-brow, cheek, mouth-width, lip-tension and chin movements. It retains only measured, face-detected candidates. All labels receive recovery and fitting when needed, including surprised.
+
+The expanded search also compares original and normalized source poses, model perspective and eye reconstruction. A population search helps cross plateaus left by individual slider adjustments. It aims for a 90% target score; results below 80% or with a different winning label are explicitly reported as unsuccessful. Difficult photos can require tens of seconds. Select another label to cancel. Fitting modifies the rendering only and does not retrain the model.
 
 The selected target and actual model label appear separately. If the best detected candidate does not match the target confidently, the interface reports that no reliable match was found for that photo. A smiling photograph can retain smiling mouth and eye textures after geometric changes, so the rig cannot promise every class for every photograph. Use a neutral, frontal, evenly lit source image. The model-input thumbnail is restored with the best measured candidate, including cached readings.
