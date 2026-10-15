@@ -2,12 +2,27 @@
 const engine = parent !== window && new URLSearchParams(location.search).has('engine');
 document.body.classList.toggle('engine',engine);
 const $ = s => document.querySelector(s);
+function publishModelState(){
+  if(engine)parent.postMessage({type:'affective-tm-state',disabled:$('#load-model').disabled,status:$('#status').textContent,url:$('#model-url').value},location.origin);
+}
+if(engine){
+  const observer=new MutationObserver(publishModelState);
+  observer.observe($('#status'),{childList:true,characterData:true,subtree:true});
+  observer.observe($('#load-model'),{attributes:true,attributeFilter:['disabled']});
+  publishModelState();
+}
+window.addEventListener('message',event=>{
+  if(!engine || event.origin!==location.origin || event.source!==parent)return;
+  if(event.data?.type==='affective-load-model' && typeof event.data.url==='string' && event.data.url.length<2048 && !$('#load-model').disabled){
+    $('#model-url').value=event.data.url;loadImageModel();
+  }
+});
 let model, video, canvas, running = false, active = false, revision = 0, requestID = 0;
 const requests = new Map();
 function setup() { if (engine) noCanvas(); else { canvas = createCanvas(360,360); canvas.parent('camera'); noLoop(); background(238); } $('#load-model').disabled = false; try { $('#model-url').value = sessionStorage.getItem('affective-tm-model-url') || ''; } catch {} }
 function draw() { background(238); if (video?.elt.readyState >= 2) { const side = Math.min(video.elt.videoWidth,video.elt.videoHeight); push();translate(width,0);scale(-1,1);image(video,0,0,width,height,(video.elt.videoWidth-side)/2,(video.elt.videoHeight-side)/2,side,side);pop(); } }
 function normalizeModelURL(value) { const url = new URL(value.trim()); const match = url.pathname.match(/^\/models\/([A-Za-z0-9_-]+)(?:\/(?:model\.json)?)?$/); if (url.protocol !== 'https:' || url.hostname !== 'teachablemachine.withgoogle.com' || !match) throw new Error('Use the shareable image model URL from Teachable Machine.'); return 'https://teachablemachine.withgoogle.com/models/'+match[1]+'/'; }
-async function loadModel() {
+async function loadImageModel() {
   let base; try { base = normalizeModelURL($('#model-url').value); } catch(e) { $('#status').textContent = e.message; return; }
   const token = ++revision; active = false; $('#load-model').disabled = true; $('#status').textContent = 'Loading your model…';
   try {
@@ -46,4 +61,4 @@ async function predict(token) {
   } catch(e) { active = false; $('#status').textContent = 'Prediction paused: '+e.message; }
 }
 window.addEventListener('message',event => { if (event.origin !== location.origin || event.source !== parent) return; const d = event.data;if (d?.type === 'affective-camera-frame') { const r = requests.get(d.id);if (r) {clearTimeout(r.timer);requests.delete(d.id);r.resolve(d.image);} } if (d?.type === 'affective-pause-model') {active = false;revision++;$('#status').textContent = 'Pretrained expression model selected. Load your model to switch back.';} });
-$('#load-model').onclick = loadModel;$('#start').onclick = startCamera;$('#stop').onclick = stopCamera;window.addEventListener('pagehide',stopCamera);
+$('#load-model').onclick = loadImageModel;$('#start').onclick = startCamera;$('#stop').onclick = stopCamera;window.addEventListener('pagehide',stopCamera);
