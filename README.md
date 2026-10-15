@@ -15,14 +15,15 @@ The workshop presentation is available at https://app.jxke.co/affective-sensing/
 4. How training works
 5. Interactive face mesh and photo UV exercise
 6. Understanding emotion through machines
-7. P5JS + ML5.js Integration, with live face tracking
-8. Define classes in Teachable Machine
-9. Collect examples, train and test
-10. Export the model
-11. Integrate it into p5.js
-12. Run your own model live
-13. p5.js and the complete TouchDesigner project
-14. Workshop resources
+7. Software Stack: p5.js and TouchDesigner, with video references
+8. P5JS + ML5.js Integration, with live face tracking
+9. Define classes in Teachable Machine
+10. Collect examples, train and test
+11. Export the model
+12. Integrate it into p5.js
+13. Run your own model live
+14. p5.js and the complete TouchDesigner project
+15. Workshop resources
 
 Use Left/Right arrows, Home/End, or the on-screen controls. Press F for fullscreen. The resource panel contains live examples and a download of this kit. Printing produces the full presentation.
 
