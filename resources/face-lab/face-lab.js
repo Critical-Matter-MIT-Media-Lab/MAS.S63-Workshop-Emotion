@@ -22,7 +22,9 @@ const wire = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x444444
 let basePositions, photoTexture, landmarker, landmarkPromise, stream, hasPhoto = false, cameraToken = 0, requestNumber = 0;
 const pendingReads = new Map();
 const calibratedPresets = new Map();
-let localEngine, selectedTarget = 'neutral', shapeExtras = {}, fitting = false, queuedRead = false;
+let localEngine, selectedTarget = 'neutral', shapeExtras = {}, fitting = false;
+let selectionVersion=0, selectionWork=Promise.resolve(), shapeVersion=0;
+const measuredShapes=new Map();
 function resize() { const {width,height} = $('#stage').getBoundingClientRect(); renderer.setSize(width,height); camera.aspect = width/height; camera.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe($('#stage'));
 let visible = true;
@@ -95,7 +97,7 @@ async function applyPhoto(source) {
   finally { $('#upload').disabled = false; $('#capture').disabled = !stream; }
 }
 function resetShape() {
-  calibratedPresets.clear();
+  selectionVersion++;calibratedPresets.clear();measuredShapes.clear();
   shapeExtras = {}; selectedTarget = 'neutral';
   $('#presets').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.textContent==='neutral')));
   ['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).value = 0);
@@ -161,6 +163,7 @@ function deform() {
     const top=lipTop.y-.04,bottom=top-Math.min(.42,gap*.45),z=Math.min(lipTop.z,lipBottom.z)-.18;
     teeth.geometry.setAttribute('position',new THREE.Float32BufferAttribute([x0,top,z,x1,top,z,x1,bottom,z,x0,bottom,z],3));teeth.geometry.setIndex([0,1,2,0,2,3]);teeth.geometry.computeBoundingSphere();
   }
+  shapeVersion++;$('#scores').replaceChildren();
   attr.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   $('#reading').textContent = hasPhoto ? 'Geometry changed. Press Re-read expression to measure it.' : 'Take a picture to compare model scores.';
 }
@@ -174,7 +177,10 @@ function engineTarget() {
 }
 async function readExpression() {
   if (!hasPhoto) return [];
-  if (pendingReads.size) { queuedRead = true; return []; }
+  const version=shapeVersion;
+  while(pendingReads.size){await new Promise(resolve=>setTimeout(resolve,20));if(version!==shapeVersion)return null;}
+  const key=JSON.stringify([controlIDs.map(id=>Number($(id).value)),shapeExtras,$('#texture').checked]);
+  if(measuredShapes.has(key)){const saved=measuredShapes.get(key);$('#model-view img').src=saved.image;$('#model-view').hidden=false;displayScores(saved.scores);return saved.scores;}
   const id = 'mesh-'+Date.now()+'-'+(++requestNumber); $('#read').disabled = true;
   $('#reading').textContent = 'Reading the rendered face with the expression classifier…';
   try {
@@ -189,13 +195,23 @@ async function readExpression() {
     const reply = new Promise((resolve,reject) => { const timer = setTimeout(() => { pendingReads.delete(id); reject(new Error('The expression model is still loading. Please try again.')); },60000); pendingReads.set(id,{resolve,reject,timer}); });
     target.postMessage({type:parent === window ? 'affective-classify' : 'affective-expression-request',id,image},location.origin);
     const scores = await reply;
-    $('#scores').replaceChildren();
-    scores.forEach(score => { const row = document.createElement('div'), name = document.createElement('span'), value = document.createElement('span'); name.textContent = score.label; value.textContent = Math.round(score.score*100)+'%'; row.append(name,value); $('#scores').append(row); });
-    const top = scores.reduce((a,b) => b.score > (a?.score ?? -1) ? b : a,null);
-    $('#reading').textContent = top ? top.label+' / '+Math.round(top.score*100)+'% model score' : 'No face recognized in this rendering. Try a smaller deformation.';
+    if(version!==shapeVersion)return null;
+    measuredShapes.set(key,{scores,image});displayScores(scores);
     return scores;
   } catch(error) { $('#reading').textContent = error.message; }
-  finally { $('#read').disabled = false; if (queuedRead && !fitting) {queuedRead = false;setTimeout(readExpression,50);} }
+  finally { $('#read').disabled = false; }
+}
+function displayScores(scores) {
+  $('#scores').replaceChildren();
+  scores.forEach(score=>{const row=document.createElement('div'),name=document.createElement('span'),value=document.createElement('span');name.textContent=score.label;value.textContent=Math.round(score.score*100)+'%';row.append(name,value);$('#scores').append(row);});
+  const top=scores.reduce((a,b)=>b.score>(a?.score ?? -1)?b:a,null);
+  $('#reading').textContent=top?'Target: '+selectedTarget+' / Read: '+top.label+' '+Math.round(top.score*100)+'%':'No face recognized in this rendering.';
+}
+function selectPreset(label) {
+  selectedTarget=label;const token=++selectionVersion;
+  $('#presets').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===label)));
+  applyPreset(label);status('Reading '+label+' / waiting for the classifier…');
+  selectionWork=selectionWork.catch(()=>{}).then(async()=>{if(token!==selectionVersion)return;await readPreset(token);}).catch(error=>{if(token===selectionVersion)status(error.message);});
 }
 window.addEventListener('message',event => {
   if (event.origin !== location.origin || (event.source !== parent && event.source !== localEngine?.contentWindow)) return;
@@ -217,7 +233,7 @@ $('#upload').addEventListener('change',async () => {
 });
 $('#reset').addEventListener('click',resetShape);
 $('#read').addEventListener('click',readExpression);
-['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).addEventListener('input',deform));
+['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).addEventListener('input',()=>{selectionVersion++;deform();}));
 ['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).addEventListener('change',() => {if(hasPhoto && !fitting)readExpression();}));
 $('#wire').addEventListener('change',() => wire.visible = $('#wire').checked);
 $('#texture').addEventListener('change',() => { material.map = $('#texture').checked ? photoTexture : null; material.color.set(material.map ? 0xffffff : 0xe5e5e5); material.needsUpdate = true; deform(); });
@@ -234,59 +250,67 @@ const shapes = {
  surprised:{values:[0,.9,.9,1,0,0],extra:{innerBrow:.4,mouthWide:-.25}}
 };
 const controlIDs = ['#smile','#jaw','#brow','#eyes','#furrow','#nose'];
-let presetTimer;
 function applyPreset(label,scale=1) {const preset=scale===1 && calibratedPresets.has(label) ? calibratedPresets.get(label) : shapes[label];shapeExtras=Object.fromEntries(Object.entries(preset.extra).map(([k,v])=>[k,v*scale]));controlIDs.forEach((id,i)=>$(id).value=preset.values[i]*scale);deform();}
 function renderPresets(labels) {
   $('#presets').replaceChildren();
-  labels.filter(label => shapes[label]).forEach(label => {
-    const button = document.createElement('button');button.textContent=label;button.type='button';button.setAttribute('aria-pressed','false');
-    button.onclick=()=>{if(fitting)return;selectedTarget=label;status('Target shape: '+label+'. Reading the rendered face…');$('#presets').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyPreset(label);clearTimeout(presetTimer);if(hasPhoto)presetTimer=setTimeout(readPreset,220);};
-    $('#presets').append(button);
-  });
+  labels.filter(label=>shapes[label]).forEach(label=>{const button=document.createElement('button');button.textContent=label;button.type='button';button.setAttribute('aria-pressed',String(label===selectedTarget));button.onclick=()=>selectPreset(label);$('#presets').append(button);});
 }
-// Reduce a preset when its geometry stops being recognized as a face.
-async function readPreset() {
-  if(pendingReads.size){queuedRead=true;return;}
-  const target=selectedTarget;
-  let scores=await readExpression();
-  for(const scale of [.7,.45,.25]) {
-    if(!Array.isArray(scores)) break;
-    if(scores?.length || target!==selectedTarget) break;
-    applyPreset(target,scale);scores=await readExpression();
-    if(scores?.length) status('Reduced '+target+' deformation to preserve face detection.');
+async function readPreset(token=selectionVersion) {
+  if(token!==selectionVersion)return;
+  const target=selectedTarget;let scores=await readExpression();
+  if(token!==selectionVersion)return;
+  const actual=scores?.find(s=>s.label===target)?.score ?? -1;
+  // All labels, including surprised, recover from missing faces and weak matches.
+  if(!scores?.length || (!calibratedPresets.has(target) && actual<.65))await fitTarget(token);
+  else {
+    const top=scores.reduce((a,b)=>a.score>b.score?a:b);
+    status(top.label===target && actual>=.55?'Target: '+target+'. The classifier’s measured result is shown below.':'No reliable '+target+' match for this photo. Best '+target+': '+Math.round(actual*100)+'%; model reads '+top.label+'. Try a neutral frontal photo.');
   }
-  if(target===selectedTarget && scores?.length && !calibratedPresets.has(target) && ['sad','angry','fearful','disgusted'].includes(target) && (scores.find(s=>s.label===target)?.score ?? 0)<.55) await fitTarget();
-  else if(target===selectedTarget && scores?.length) status(calibratedPresets.has(target) ? 'Using the fitted '+target+' shape for this photo.' : 'Target shape: '+target+'. Actual classifier output is shown below.');
 }
-async function fitTarget() {
-  if (!hasPhoto || fitting || pendingReads.size) return;
+async function fitTarget(token=selectionVersion) {
+  if(!hasPhoto || token!==selectionVersion)return;
   fitting=true;$('#fit').disabled=true;
-  const target=selectedTarget;let bestScore=-1,bestScale=1,bestValues;
-  const controls=[...document.querySelectorAll('.fine-controls input')];controls.forEach(el=>el.disabled=true);
+  const target=selectedTarget,controls=[...document.querySelectorAll('.fine-controls input')];controls.forEach(el=>el.disabled=true);
+  let best=null,evaluations=0;
+  const snapshot=()=>({values:controlIDs.map(id=>Number($(id).value)),extra:{...shapeExtras}});
+  const restore=state=>{shapeExtras={...state.extra};controlIDs.forEach((id,i)=>$(id).value=state.values[i]);deform();};
+  const measure=async()=>{
+    if(token!==selectionVersion)throw new Error('Superseded by the next preset.');
+    status('Fitting '+target+' / measuring shape '+(++evaluations)+'…');
+    const scores=await readExpression();
+    if(token!==selectionVersion)throw new Error('Superseded by the next preset.');
+    if(!Array.isArray(scores))throw new Error('Reading changed. Select the preset again.');
+    if(!scores.length)return;
+    const score=scores.find(s=>s.label===target)?.score ?? 0;
+    if(!best || score>best.score)best={...snapshot(),score,scores};
+  };
   try {
-    for (const scale of [.45,.7,1]) {
-      applyPreset(target,scale);status('Testing '+target+' shape / intensity '+Math.round(scale*100)+'%…');
-      const scores=await readExpression();const score=scores?.find(s=>s.label===target)?.score ?? -1;
-      if(score>bestScore){bestScore=score;bestScale=scale;}
+    // Keep the selected rendering as a candidate. Never replace a recognized best shape with a failed detection.
+    await measure();
+    for(const scale of [0,.25,.5,.75,1]){
+      if(best?.score>=.85)break;
+      applyPreset(target,scale);await measure();
     }
-    applyPreset(target,bestScale);bestValues=controlIDs.map(id=>Number($(id).value));
-    // Keep only changes that improve the actual requested class score for this photograph.
-    for(let i=0;i<controlIDs.length;i++) {
-      const original=bestValues[i],input=$(controlIDs[i]);
-      for(const direction of [-1,1]) {
-        const candidate=Math.max(Number(input.min),Math.min(Number(input.max),original+direction*.3));
-        if(candidate===original)continue;
-        controlIDs.forEach((id,j)=>$(id).value=j===i?candidate:bestValues[j]);deform();
-        status('Fitting '+target+' / '+input.parentElement.textContent.trim()+'…');
-        const scores=await readExpression(),score=scores?.find(s=>s.label===target)?.score ?? -1;
-        if(score>bestScore){bestScore=score;bestValues[i]=candidate;}
+    if(!best){applyPreset(target,0);await readExpression();status('No recognizable face in the tested shapes. Take a clear frontal photo, then try again.');return;}
+    // Search both the visible controls and the coordinated cheek, lip and inner-brow movements.
+    const extraRanges={innerBrow:[-1,1],cheek:[0,1],mouthWide:[-1,1],lipPress:[0,1],chinRaise:[0,1]};
+    const parameters=[...controlIDs.map((id,i)=>({i,min:Number($(id).min),max:Number($(id).max),step:.3})),...Object.entries(extraRanges).map(([key,[min,max]])=>({key,min,max,step:.3}))];
+    for(const parameter of parameters){
+      if(best.score>=.85)break;
+      const center=parameter.key?(best.extra[parameter.key]||0):best.values[parameter.i];
+      for(const direction of [-1,1]){
+        const value=Math.max(parameter.min,Math.min(parameter.max,center+direction*parameter.step));
+        if(value===center)continue;
+        restore(best);if(parameter.key)shapeExtras[parameter.key]=value;else $(controlIDs[parameter.i]).value=value;deform();await measure();
       }
     }
-    controlIDs.forEach((id,i)=>$(id).value=bestValues[i]);deform();await readExpression();
-    calibratedPresets.set(target,{values:[...bestValues],extra:{...shapeExtras}});
-    status('Best tested '+target+' score: '+Math.round(Math.max(0,bestScore)*100)+'%. Geometry, photograph and model can disagree.');
-  } finally {fitting=false;queuedRead=false;$('#fit').disabled=false;controls.forEach(el=>el.disabled=false);}
+    if(token!==selectionVersion)return;
+    restore(best);await readExpression();calibratedPresets.set(target,{values:[...best.values],extra:{...best.extra}});
+    const top=best.scores.reduce((a,b)=>a.score>b.score?a:b);
+    status(top.label===target && best.score>=.55?'Fitted '+target+' / '+Math.round(best.score*100)+'% actual model score.':'No reliable '+target+' match for this photo. Best '+target+': '+Math.round(best.score*100)+'%; model reads '+top.label+'. Try another photo or fine adjustments.');
+  } catch(error) {if(token===selectionVersion)status(error.message);}
+  finally {fitting=false;$('#fit').disabled=false;controls.forEach(el=>el.disabled=false);}
 }
-$('#fit').onclick=fitTarget;
+$('#fit').onclick=()=>{const token=++selectionVersion;selectionWork=selectionWork.catch(()=>{}).then(()=>fitTarget(token));};
 // Populate from the classifier's exported label list, including standalone mode.
 const labelEngine = await engineTarget();labelEngine.postMessage({type:'affective-labels-request'},location.origin);

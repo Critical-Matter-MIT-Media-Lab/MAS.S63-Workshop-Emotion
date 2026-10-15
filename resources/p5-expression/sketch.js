@@ -145,7 +145,8 @@ function frameImage(square) {
 window.addEventListener('message',async event => {
   if (event.origin !== location.origin || event.source !== parent) return;
   const data = event.data;
-  if (data?.type === 'affective-camera-layout') { document.body.classList.toggle('docked',data.docked); document.body.classList.toggle('transitioning',!!data.transitioning); document.querySelector('#dock-stop').hidden = true; }
+  if (data?.type === 'affective-camera-layout') {document.body.classList.remove('docked','transitioning');document.body.classList.toggle('camera-only',data.docked || data.transitioning);document.querySelector('#dock-stop').hidden=true;}
+
   if (data?.type === 'affective-labels-request') {
     await ensureModel(); parent.postMessage({type:'affective-model-labels',labels:names},location.origin);
   }
@@ -160,3 +161,10 @@ window.addEventListener('message',async event => {
 });
 document.querySelector('#dock-stop').addEventListener('click',stopCamera);
 document.querySelector('#pretrained').addEventListener('click',() => { activeModel = 'pretrained'; document.querySelector('#pretrained').hidden = true; document.querySelector('#model-title').textContent = 'Expression model'; parent.postMessage({type:'affective-pretrained-selected'},location.origin); });
+
+function publishCameraGeometry(){
+  const r=document.querySelector('.camera-window').getBoundingClientRect();
+  if(parent!==window && r.width>0 && r.height>0)parent.postMessage({type:'affective-camera-geometry',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},location.origin);
+}
+const cameraGeometryObserver=new ResizeObserver(publishCameraGeometry);
+['.camera-window','.controls','#status'].forEach(selector=>cameraGeometryObserver.observe(document.querySelector(selector)));

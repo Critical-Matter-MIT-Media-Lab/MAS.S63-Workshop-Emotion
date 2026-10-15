@@ -20,8 +20,8 @@ The workshop presentation is available at https://app.jxke.co/affective-sensing/
 9. Collect examples, train and test
 10. Export the model
 11. Integrate it into p5.js
-12. p5.js and the complete TouchDesigner project
-13. Run your own model live
+12. Run your own model live
+13. p5.js and the complete TouchDesigner project
 14. Workshop resources
 
 Use Left/Right arrows, Home/End, or the on-screen controls. Press F for fullscreen. The resource panel contains live examples and a download of this kit. Printing produces the full presentation.
@@ -56,7 +56,7 @@ To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.htm
 
 Follow [the Teachable Machine guide](resources/teachable-p5/README.md). The [complete minimal sketch](resources/teachable-p5/minimal-sketch.md) loads its model libraries automatically and can be copied directly into sketch.js in the p5 editor.
 
-The presentation keeps one camera feed alive. It is large on slides 7 and 13, and moves to the bottom-right corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
+The presentation keeps one camera feed alive. It is large on slides 7 and 12, and moves to the bottom-right corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
 
 Slide 9 offers three comparison captures: empty room, person at rest, and person performing an expression. Each capture has a three-second countdown. Images remain in memory on the page.
 

@@ -33,3 +33,9 @@ The lab fits inside its slide, with compact controls and no internal page scroll
 The sad preset uses a smaller, localized mouth-corner movement. Angry combines brow lowering/furrowing and lip tension; disgusted adds localized nose and upper-lip movement with chin lift. Fearful combines inner-brow motion, wider eyelids and horizontal mouth stretch. If a selected preset loses face detection, the lab tests reduced strengths to restore it. Scores still come from the unchanged classifier; selecting a preset never forces its output label.
 
 Weak sad, angry, fearful and disgusted presets automatically run the same measured fitting search. Fitted controls are reused for that photo and cleared on reset or a new photo. This calibration maximizes the chosen classifier score for the synthetic rendering; it does not validate the emotion label or alter the model weights.
+
+## Measurement queue and unsuccessful fits
+
+Every selected preset now waits for the preceding measurement; a newer selection cancels an older fit. Old scores clear immediately when geometry changes. The fitting search includes the current pose, the undeformed photo mesh, five preset strengths, the six visible controls, and coordinated inner-brow, cheek, mouth-width, lip-tension and chin movements. It retains only measured, face-detected candidates. All labels receive recovery and fitting when needed, including surprised.
+
+The selected target and actual model label appear separately. If the best detected candidate does not match the target confidently, the interface reports that no reliable match was found for that photo. A smiling photograph can retain smiling mouth and eye textures after geometric changes, so the rig cannot promise every class for every photograph. Use a neutral, frontal, evenly lit source image. The model-input thumbnail is restored with the best measured candidate, including cached readings.

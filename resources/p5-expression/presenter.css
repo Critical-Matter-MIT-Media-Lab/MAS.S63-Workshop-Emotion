@@ -4,3 +4,5 @@
 html,body{height:100%}.docked #dock-stop{display:none!important}.transitioning .controls,.transitioning #status,.transitioning aside{visibility:hidden}.transitioning .camera-layout{display:block;height:100%}.transitioning .camera-window{height:100%;aspect-ratio:auto}.transitioning{padding:0!important;overflow:hidden}.transitioning .controls,.transitioning #status{display:none}.docked video,.transitioning video{object-fit:fill}.docked #face-overlay,.transitioning #face-overlay{width:100%;height:100%}
 
 .embedded:not(.docked) #scores>div{padding:4px 0;font-size:11px}.embedded:not(.docked) h2{font-size:13px;margin-bottom:12px}.embedded:not(.docked) #result{font-size:20px;margin-bottom:12px}
+
+.camera-only .controls,.camera-only #status,.camera-only aside,.camera-only .standalone{visibility:hidden;pointer-events:none}.camera-only #dock-stop{display:none!important}.embedded{overflow:hidden}
