@@ -29,3 +29,7 @@ Fit target tests preset strengths and small changes to each of the six controls.
 A photograph retains its original mouth appearance, eye texture, and lighting as the geometry moves. Consequently a smiling photograph can still read as happy after an angry preset, and a neutral photograph can remain neutral after a small edit. Start from a clear, evenly lit frontal photo. The classifier reads the rendered pixels; it does not know which preset was selected and was not trained specifically on these synthetic mesh edits.
 
 The lab fits inside its slide, with compact controls and no internal page scrolling at the supported desktop presentation sizes.
+
+The sad preset uses a smaller, localized mouth-corner movement. Angry combines brow lowering/furrowing and lip tension; disgusted adds localized nose and upper-lip movement with chin lift. Fearful combines inner-brow motion, wider eyelids and horizontal mouth stretch. If a selected preset loses face detection, the lab tests reduced strengths to restore it. Scores still come from the unchanged classifier; selecting a preset never forces its output label.
+
+Weak sad, angry, fearful and disgusted presets automatically run the same measured fitting search. Fitted controls are reused for that photo and cleared on reset or a new photo. This calibration maximizes the chosen classifier score for the synthetic rendering; it does not validate the emotion label or alter the model weights.

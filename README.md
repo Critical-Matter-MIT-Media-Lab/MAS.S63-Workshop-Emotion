@@ -20,8 +20,9 @@ The workshop presentation is available at https://app.jxke.co/affective-sensing/
 9. Collect examples, train and test
 10. Export the model
 11. Integrate it into p5.js
-12. Run your own model live
-13. Workshop resources
+12. p5.js and the complete TouchDesigner project
+13. Run your own model live
+14. Workshop resources
 
 Use Left/Right arrows, Home/End, or the on-screen controls. Press F for fullscreen. The resource panel contains live examples and a download of this kit. Printing produces the full presentation.
 
@@ -55,7 +56,7 @@ To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.htm
 
 Follow [the Teachable Machine guide](resources/teachable-p5/README.md). The [complete minimal sketch](resources/teachable-p5/minimal-sketch.md) loads its model libraries automatically and can be copied directly into sketch.js in the p5 editor.
 
-The presentation keeps one camera feed alive. It is large on slides 7 and 12, and moves to the bottom-left corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
+The presentation keeps one camera feed alive. It is large on slides 7 and 13, and moves to the bottom-right corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
 
 Slide 9 offers three comparison captures: empty room, person at rest, and person performing an expression. Each capture has a three-second countdown. Images remain in memory on the page.
 
@@ -65,7 +66,7 @@ The GitHub QR code appears beside the discussion slide resources, on the final s
 
 Open the face-mesh slide or `resources/face-lab/index.html`. Drag to rotate the canonical 468-vertex face, or start the camera and take a picture. You can also select an image file. MediaPipe finds the landmarks, and the photograph becomes the UV texture of the resulting 3D mesh. Images stay in browser memory.
 
-Choose one of the expression classifier’s own labels to apply an approximate shape preset, or fine-tune the mouth, jaw, brow, eyelid, furrow and nose / upper-lip controls. The inner-lip triangles are removed to form an actual mouth opening with a recessed interior. The Model input thumbnail shows the image passed to the classifier. Fit target tests shape variations against actual scores, without replacing the classifier output with the selected label. Press **Re-read expression** to pass a stable front view of the textured mesh through the expression classifier. The displayed scores are actual model outputs. A large deformation can result in no detected face. The sliders illustrate changes in appearance and do not retrain the model or establish someone's internal feelings.
+Choose one of the expression classifier’s own labels to apply an approximate shape preset, or fine-tune the mouth, jaw, brow, eyelid, furrow and nose / upper-lip controls. The inner-lip triangles are removed to form an actual mouth opening with a recessed interior. The Model input thumbnail shows the image passed to the classifier. Weaker presets automatically test shape variations against actual scores; Fit target can repeat the search, without replacing the classifier output with the selected label. Press **Re-read expression** to pass a stable front view of the textured mesh through the expression classifier. The displayed scores are actual model outputs. A large deformation can result in no detected face. The sliders illustrate changes in appearance and do not retrain the model or establish someone's internal feelings.
 
 The mesh is a separate geometric representation. The expression classifier reads the rendered pixels. The slide deck shares a preloaded ml5 expression runtime with this exercise. The standalone lab loads its own hidden expression runtime.
 
@@ -86,9 +87,9 @@ Discussion: What exactly did you label? Which examples failed? Did your backgrou
 
 ## 3. TouchDesigner
 
-Follow [the minimal receiver guide](resources/touchdesigner/README.md). It creates an isolated receiver from a short Python setup script and callbacks. The pretrained expression demo and optional ml5 training sketch can send labels and scores to it. Add a DAT to CHOP and use a score to control a color.
+Open [the complete TouchDesigner project](resources/touchdesigner/README.md). The workshop includes Jake’s original **ML5 TouchDesigner.toe**, browser source, bundled libraries, local models, and support scripts from [ml5-touchdesigner](https://github.com/Jxke/ml5-touchdesigner). Extract the workshop ZIP and keep the folder structure together before opening the .toe.
 
-This follows the browser-to-WebSocket-to-DAT approach in Jake’s `ml5-touchdesigner` project, with one mode and a small numeric table. It does not modify or require that larger project. Source scripts are included instead of an unverified `.tox` export.
+The original project file is preserved byte for byte. The Python-only minimal receiver remains an optional exercise; it is not a substitute for the full project.
 
 ## Reading and source references
 

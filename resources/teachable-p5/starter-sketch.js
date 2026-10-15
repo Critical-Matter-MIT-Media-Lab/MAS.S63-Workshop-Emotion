@@ -6,10 +6,17 @@ let model, video, ready = false, starting = false, generation = 0, message;
 const modelInput = document.createElement('canvas');
 modelInput.width = modelInput.height = 224;
 function setup() {
-  createCanvas(640,480); // A regular 4:3 webcam view, with no square display crop.
-  createButton('Start camera').mousePressed(startModel);
-  createButton('Stop camera').mousePressed(stopModel);
-  message = createP('Paste MODEL_URL above, then start the camera.');
+  const style = document.createElement('style');
+  style.textContent = `#affective-loader{font:14px/1.4 Arial,sans-serif;color:#171717;background:#fff;border:1px solid #d6d6d6;border-radius:10px;overflow:hidden;width:min(640px,calc(100vw - 32px));margin:16px;box-sizing:border-box}#affective-loader canvas{display:block;width:100%!important;height:auto!important}#affective-loader .loader-toolbar{padding:12px 14px;display:flex;gap:8px;align-items:center;background:#f6f6f6}#affective-loader button{font:12px Arial,sans-serif;color:#171717;background:#fff;border:1px solid #bbb;border-radius:5px;padding:7px 10px;cursor:pointer}#affective-loader .loader-readout{color:#171717!important;background:#fff!important;font-size:16px;font-weight:600;padding:14px 16px;margin:0;min-height:48px;overflow-wrap:anywhere;box-sizing:border-box}#affective-loader .loader-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#555;padding:12px 16px;margin:0;border-bottom:1px solid #ddd}`;
+  document.head.append(style);
+  const shell = createDiv().id('affective-loader');
+  createP('Your image model / live webcam').class('loader-heading').parent(shell);
+  createCanvas(640,480).parent(shell);
+  message = createP('Paste MODEL_URL above, then start the camera.').class('loader-readout').parent(shell);
+  message.elt.setAttribute('role','status');
+  const toolbar = createDiv().class('loader-toolbar').parent(shell);
+  createButton('Start camera').parent(toolbar).mousePressed(startModel);
+  createButton('Stop camera').parent(toolbar).mousePressed(stopModel);
 }
 function loadLibrary(url) {
   return new Promise((resolve,reject) => {

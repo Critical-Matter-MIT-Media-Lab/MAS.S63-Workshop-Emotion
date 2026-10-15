@@ -21,6 +21,7 @@ const teeth = new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMater
 const wire = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x444444,wireframe:true,transparent:true,opacity:.45,depthWrite:false})); scene.add(wire);
 let basePositions, photoTexture, landmarker, landmarkPromise, stream, hasPhoto = false, cameraToken = 0, requestNumber = 0;
 const pendingReads = new Map();
+const calibratedPresets = new Map();
 let localEngine, selectedTarget = 'neutral', shapeExtras = {}, fitting = false, queuedRead = false;
 function resize() { const {width,height} = $('#stage').getBoundingClientRect(); renderer.setSize(width,height); camera.aspect = width/height; camera.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe($('#stage'));
@@ -94,7 +95,9 @@ async function applyPhoto(source) {
   finally { $('#upload').disabled = false; $('#capture').disabled = !stream; }
 }
 function resetShape() {
+  calibratedPresets.clear();
   shapeExtras = {}; selectedTarget = 'neutral';
+  $('#presets').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.textContent==='neutral')));
   ['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).value = 0);
   camera.position.set(0,0,34); controls.target.set(0,0,0); controls.update();
   mesh.rotation.set(0,0,0); wire.rotation.set(0,0,0); deform();
@@ -103,9 +106,9 @@ function point(index) { return [basePositions[index*3],basePositions[index*3+1]]
 function deform() {
   if (!basePositions) return;
   const smile = Number($('#smile').value), jaw = Number($('#jaw').value), brow = Number($('#brow').value), eyes = Number($('#eyes').value), furrow = Number($('#furrow').value), nose = Number($('#nose').value);
-  const {innerBrow=0,cheek=0,mouthWide=0,lipPress=0} = shapeExtras;
+  const {innerBrow=0,cheek=0,mouthWide=0,lipPress=0,chinRaise=0} = shapeExtras;
   const left = point(61), right = point(291), mouth = point(14);
-  const browL = point(70), browR = point(300), innerL=point(107), innerR=point(336), cheekL=point(50), cheekR=point(280);
+  const browL = point(105), browR = point(334), innerL=point(55), innerR=point(285), cheekL=point(50), cheekR=point(280);
   const gaussian = (x,y,p,s) => Math.exp(-((x-p[0])**2+(y-p[1])**2)/(2*s*s));
   const eyeTop = new Set([159,158,157,160,161,246,386,385,384,387,388,466]);
   const eyeBottom = new Set([145,144,153,154,155,163,374,373,380,381,382,390]);
@@ -113,17 +116,21 @@ function deform() {
   const attr = geometry.attributes.position;
   for (let i=0;i<attr.count;i++) {
     let x = basePositions[i*3], y = basePositions[i*3+1], z = basePositions[i*3+2];
-    const corners = gaussian(x,y,left,1.05)+gaussian(x,y,right,1.05);
+    const corners = gaussian(x,y,left,smile < 0 ? .8 : 1.05)+gaussian(x,y,right,smile < 0 ? .8 : 1.05);
     const outerBrows = gaussian(x,y,browL,.9)+gaussian(x,y,browR,.9);
     const innerBrows = gaussian(x,y,innerL,.65)+gaussian(x,y,innerR,.65);
     const jawWeight = THREE.MathUtils.clamp((mouth[1]-y+.4)/4,0,1)*Math.exp(-(((x-mouth[0])/4.5)**2));
-    y += smile*1.25*corners + brow*.8*outerBrows + innerBrow*.95*innerBrows - furrow*.85*innerBrows - jaw*1.7*jawWeight;
+    y += smile*1.25*corners + brow*.8*outerBrows + innerBrow*.95*innerBrows - furrow*.65*innerBrows - jaw*1.7*jawWeight;
     x += (smile*.25 + mouthWide*.55)*Math.sign(x-mouth[0])*corners;
     x -= furrow*.25*Math.sign(x)*innerBrows;
     y += cheek*.45*(gaussian(x,y,cheekL,1)+gaussian(x,y,cheekR,1));
     if (eyeTop.has(i)) y += eyes*.45;
     if (eyeBottom.has(i)) y -= eyes*.3;
-    if (upperLip.has(i)) y += nose*.5;
+    if (upperLip.has(i)) y += nose*(.25+.65*gaussian(x,y,point(0),1.1));
+    const noseRoot = gaussian(x,y,point(6),.75);
+    y += nose*.3*noseRoot + chinRaise*.45*gaussian(x,y,point(17),1);
+    x -= nose*.2*Math.sign(x)*gaussian(x,y,point(4),1.2);
+    z += nose*.3*noseRoot;
     z += nose*.2*gaussian(x,y,point(4),1.1);
     if (innerLips.has(i)) {
       const upper = upperLip.has(i);
@@ -220,24 +227,38 @@ document.addEventListener('keydown',event => { if (parent !== window && !event.t
 const shapes = {
  neutral:{values:[0,0,0,0,0,0],extra:{}},
  happy:{values:[1,.12,.05,-.6,0,0],extra:{cheek:1,mouthWide:.4}},
- sad:{values:[-.8,0,-.25,-.15,0,0],extra:{innerBrow:.85,lipPress:.3}},
- angry:{values:[-.25,0,-.25,-.5,1,0],extra:{lipPress:.8}},
- fearful:{values:[-.2,.4,.45,.8,.2,0],extra:{innerBrow:.7,mouthWide:.8}},
- disgusted:{values:[-.35,.06,-.1,-.45,.45,1],extra:{cheek:.3,lipPress:.25}},
+ sad:{values:[-.38,0,-.12,-.08,.12,0],extra:{innerBrow:.5,chinRaise:.2}},
+ angry:{values:[-.15,0,-.35,-.28,.9,0],extra:{lipPress:.9,chinRaise:.35,mouthWide:-.15}},
+ fearful:{values:[-.12,.25,.3,.5,.45,0],extra:{innerBrow:.55,mouthWide:.8}},
+ disgusted:{values:[-.2,0,-.2,-.28,.4,.9],extra:{cheek:.25,lipPress:.15,chinRaise:.6}},
  surprised:{values:[0,.9,.9,1,0,0],extra:{innerBrow:.4,mouthWide:-.25}}
 };
 const controlIDs = ['#smile','#jaw','#brow','#eyes','#furrow','#nose'];
 let presetTimer;
-function applyPreset(label,scale=1) {const preset=shapes[label];shapeExtras=Object.fromEntries(Object.entries(preset.extra).map(([k,v])=>[k,v*scale]));controlIDs.forEach((id,i)=>$(id).value=preset.values[i]*scale);deform();}
+function applyPreset(label,scale=1) {const preset=scale===1 && calibratedPresets.has(label) ? calibratedPresets.get(label) : shapes[label];shapeExtras=Object.fromEntries(Object.entries(preset.extra).map(([k,v])=>[k,v*scale]));controlIDs.forEach((id,i)=>$(id).value=preset.values[i]*scale);deform();}
 function renderPresets(labels) {
   $('#presets').replaceChildren();
   labels.filter(label => shapes[label]).forEach(label => {
     const button = document.createElement('button');button.textContent=label;button.type='button';button.setAttribute('aria-pressed','false');
-    button.onclick=()=>{if(fitting)return;selectedTarget=label;$('#presets').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyPreset(label);clearTimeout(presetTimer);if(hasPhoto)presetTimer=setTimeout(readExpression,220);};
+    button.onclick=()=>{if(fitting)return;selectedTarget=label;status('Target shape: '+label+'. Reading the rendered face…');$('#presets').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyPreset(label);clearTimeout(presetTimer);if(hasPhoto)presetTimer=setTimeout(readPreset,220);};
     $('#presets').append(button);
   });
 }
-$('#fit').onclick=async()=>{
+// Reduce a preset when its geometry stops being recognized as a face.
+async function readPreset() {
+  if(pendingReads.size){queuedRead=true;return;}
+  const target=selectedTarget;
+  let scores=await readExpression();
+  for(const scale of [.7,.45,.25]) {
+    if(!Array.isArray(scores)) break;
+    if(scores?.length || target!==selectedTarget) break;
+    applyPreset(target,scale);scores=await readExpression();
+    if(scores?.length) status('Reduced '+target+' deformation to preserve face detection.');
+  }
+  if(target===selectedTarget && scores?.length && !calibratedPresets.has(target) && ['sad','angry','fearful','disgusted'].includes(target) && (scores.find(s=>s.label===target)?.score ?? 0)<.55) await fitTarget();
+  else if(target===selectedTarget && scores?.length) status(calibratedPresets.has(target) ? 'Using the fitted '+target+' shape for this photo.' : 'Target shape: '+target+'. Actual classifier output is shown below.');
+}
+async function fitTarget() {
   if (!hasPhoto || fitting || pendingReads.size) return;
   fitting=true;$('#fit').disabled=true;
   const target=selectedTarget;let bestScore=-1,bestScale=1,bestValues;
@@ -262,8 +283,10 @@ $('#fit').onclick=async()=>{
       }
     }
     controlIDs.forEach((id,i)=>$(id).value=bestValues[i]);deform();await readExpression();
+    calibratedPresets.set(target,{values:[...bestValues],extra:{...shapeExtras}});
     status('Best tested '+target+' score: '+Math.round(Math.max(0,bestScore)*100)+'%. Geometry, photograph and model can disagree.');
   } finally {fitting=false;queuedRead=false;$('#fit').disabled=false;controls.forEach(el=>el.disabled=false);}
-};
+}
+$('#fit').onclick=fitTarget;
 // Populate from the classifier's exported label list, including standalone mode.
 const labelEngine = await engineTarget();labelEngine.postMessage({type:'affective-labels-request'},location.origin);
