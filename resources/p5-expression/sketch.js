@@ -79,6 +79,7 @@ async function detect(token) {
 function stopCamera() {
   running = false; generation++; setLiveRunning(false);
   video?.elt.srcObject?.getTracks().forEach(track => track.stop()); video?.remove(); video = null;
+  if (faceapi) faceapi.video = undefined;
   document.querySelector('#start').disabled = false; document.querySelector('#stop').disabled = true;
   document.querySelector('#result').textContent = 'No prediction'; document.querySelector('#scores').textContent = '';
   statusText('Camera off. Your log is preserved.'); sendToTouchDesigner(emptyValues());
