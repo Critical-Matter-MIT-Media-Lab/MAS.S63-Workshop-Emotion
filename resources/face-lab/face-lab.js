@@ -55,7 +55,7 @@ const innerLips = new Set([78,95,88,178,87,14,317,402,318,324,308,415,310,311,31
 const openIndices = [];
 for (let i=0;i<topology.indices.length;i+=3) { const triangle = topology.indices.slice(i,i+3); if (!triangle.every(v => innerLips.has(v))) openIndices.push(...triangle); }
 geometry.setIndex(openIndices); geometry.setAttribute('uv',new THREE.Float32BufferAttribute(topology.uv.flat(),2));
-setPositions(topology.positions); wire.visible = false; deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
+setPositions(topology.positions); wire.visible = $('#wire').checked; deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
 status('468 landmarks / editable eyes, brows, lips and nose. Rotate the mesh, or take a picture to map your face onto it.');
 
 async function ensureLandmarker() {
@@ -230,13 +230,28 @@ async function readExpression() {
     const distance=perspective>.99?34:34+Math.pow(1-perspective,3)*9966;
     frontCamera.position.set(0,0,distance);frontCamera.fov=2*Math.atan(10.4/distance)*180/Math.PI;frontCamera.updateProjectionMatrix();
     renderer.setPixelRatio(1); renderer.setSize(480,480,false); renderer.render(scene,frontCamera);
-    const image = renderer.domElement.toDataURL('image/jpeg',.9);
+    // This is a known face mesh: use its projected bounds rather than requiring
+    // the photo face detector to rediscover an artificially deformed face.
+    const positions=geometry.getAttribute('position'),point=new THREE.Vector3();
+    let left=480,top=480,right=0,bottom=0;
+    for(let i=0;i<positions.count;i++){
+      point.fromBufferAttribute(positions,i).project(frontCamera);
+      const x=(point.x+1)*240,y=(1-point.y)*240;
+      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+    }
+    const padX=(right-left)*.04,padY=(bottom-top)*.04;
+    left=Math.max(0,left-padX);top=Math.max(0,top-padY);
+    right=Math.min(480,right+padX);bottom=Math.min(480,bottom+padY);
+    const crop=document.createElement('canvas');crop.width=crop.height=256;
+    crop.getContext('2d').drawImage(renderer.domElement,left,top,right-left,bottom-top,0,0,256,256);
+    const image = crop.toDataURL('image/jpeg',.95);
     $('#model-view img').src=image;$('#model-view').hidden=false;
     renderer.setPixelRatio(oldRatio); renderer.setSize(oldSize.x,oldSize.y,false); mesh.rotation.copy(oldRotation); wire.visible = showWire; renderer.render(scene,camera);
     const target = await engineTarget();
-    const reply = new Promise((resolve,reject) => { const timer = setTimeout(() => { pendingReads.delete(id); reject(new Error('The expression model is still loading. Please try again.')); },60000); pendingReads.set(id,{resolve,reject,timer}); });
-    target.postMessage({type:parent === window ? 'affective-classify' : 'affective-expression-request',id,image},location.origin);
+    const reply = new Promise((resolve,reject) => { const timer = setTimeout(() => { pendingReads.delete(id); reject(new Error('The expression model is still loading. Please try again.')); },120000); pendingReads.set(id,{resolve,reject,timer}); });
+    target.postMessage({type:parent === window ? 'affective-classify' : 'affective-expression-request',id,image,knownMesh:true},location.origin);
     const scores = await reply;
+    await new Promise(resolve=>setTimeout(resolve,32)); // Let input and painting run between GPU reads.
     if(version!==shapeVersion)return null;
     if(measuredShapes.size>=1200)measuredShapes.delete(measuredShapes.keys().next().value);
     measuredShapes.set(key,{scores,image});displayScores(scores);
@@ -317,11 +332,14 @@ async function fitTarget(token=selectionVersion) {
   fitting=true;$('#fit').disabled=true;
   const target=selectedTarget,controls=[...document.querySelectorAll('.fine-controls input')];controls.forEach(el=>el.disabled=true);
   let best=null,evaluations=0;
+  const started=performance.now(),maxEvaluations=96,maxMilliseconds=25000;
+  const withinBudget=()=>evaluations<maxEvaluations && performance.now()-started<maxMilliseconds;
   const population=[];
   const snapshot=()=>({values:controlIDs.map(id=>Number($(id).value)),extra:{...shapeExtras}});
   const restore=state=>{setExtras(state.extra);controlIDs.forEach((id,i)=>$(id).value=state.values[i]);deform();};
   const measure=async()=>{
     if(token!==selectionVersion)throw new Error('Superseded by the next preset.');
+    if(!withinBudget())throw new Error('Fit budget reached');
     status('Fitting '+target+' / measuring shape '+(++evaluations)+'…');
     const scores=await readExpression();
     if(token!==selectionVersion)throw new Error('Superseded by the next preset.');
@@ -406,7 +424,15 @@ async function fitTarget(token=selectionVersion) {
     restore(best);await readExpression();calibratedPresets.set(target,{values:[...best.values],extra:{...best.extra}});
     const top=best.scores.reduce((a,b)=>a.score>b.score?a:b);
     status(top.label===target && best.score>=.8?'Fitted '+target+' / '+Math.round(best.score*100)+'% actual model score.':'No reliable '+target+' match for this photo. Best '+target+': '+Math.round(best.score*100)+'%; model reads '+top.label+'. Try another photo or fine adjustments.');
-  } catch(error) {if(token===selectionVersion)status(error.message);}
+  } catch(error) {
+    if(token===selectionVersion){
+      if(best && error.message==='Fit budget reached'){
+        restore(best);await readExpression();
+        calibratedPresets.set(target,{values:[...best.values],extra:{...best.extra}});
+        status('Fit paused after '+evaluations+' reads. Best '+target+': '+Math.round(best.score*100)+'%. Use fine adjustments or Fit target to continue.');
+      } else status(error.message);
+    }
+  }
   finally {fitting=false;$('#fit').disabled=false;controls.forEach(el=>el.disabled=false);}
 }
 $('#fit').onclick=()=>{const token=++selectionVersion;selectionWork=selectionWork.catch(()=>{}).then(()=>fitTarget(token));};

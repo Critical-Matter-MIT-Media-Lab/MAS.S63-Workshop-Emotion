@@ -31,9 +31,15 @@ function ensureModel() {
   });
   return modelPromise;
 }
-function infer(input) {
+function infer(input, knownMesh = false) {
   const task = inferenceQueue.catch(() => {}).then(async () => {
     await ensureModel();
+    if(knownMesh){
+      // The mesh renderer supplies an already cropped face. Keep the existing
+      // expression weights, without imposing the SSD photo detector on synthetic geometry.
+      const expressions=await faceapi.model.nets.faceExpressionNet.predictExpressions(input);
+      return [{expressions}];
+    }
     return input ? faceapi.detect(input) : faceapi.detect();
   });
   inferenceQueue = task;
@@ -93,7 +99,7 @@ window.addEventListener('message', async event => {
   if (typeof image !== 'string' || !/^data:image\/(png|jpeg);base64,/.test(image) || image.length > 2500000) return;
   try {
     const img = new Image(); img.src = image; await img.decode();
-    const faces = await infer(img);
+    const faces = await infer(img,event.data.knownMesh === true);
     const scores = faces?.length ? names.map(label => ({label,score:Number(faces[0].expressions[label]) || 0})) : [];
     event.source.postMessage({type:'affective-expression-result',id,scores},location.origin);
   } catch(error) { event.source.postMessage({type:'affective-expression-result',id,error:error.message},location.origin); }
