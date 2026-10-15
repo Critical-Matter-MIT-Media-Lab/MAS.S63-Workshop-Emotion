@@ -16,11 +16,12 @@ const light = new THREE.DirectionalLight(0xffffff,2); light.position.set(1,2,5);
 const geometry = new THREE.BufferGeometry();
 const material = new THREE.MeshBasicMaterial({color:0xe5e5e5,side:THREE.DoubleSide});
 const mesh = new THREE.Mesh(geometry,material); scene.add(mesh);
-const cavity = new THREE.Mesh(new THREE.SphereGeometry(1,32,20),new THREE.MeshBasicMaterial({color:0x180b0e})); mesh.add(cavity);
+const cavity = new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0x241619,side:THREE.DoubleSide})); mesh.add(cavity);
+const teeth = new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0xeee8dc,side:THREE.DoubleSide}));mesh.add(teeth);
 const wire = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x444444,wireframe:true,transparent:true,opacity:.45,depthWrite:false})); scene.add(wire);
 let basePositions, photoTexture, landmarker, landmarkPromise, stream, hasPhoto = false, cameraToken = 0, requestNumber = 0;
 const pendingReads = new Map();
-let localEngine;
+let localEngine, selectedTarget = 'neutral', shapeExtras = {}, fitting = false, queuedRead = false;
 function resize() { const {width,height} = $('#stage').getBoundingClientRect(); renderer.setSize(width,height); camera.aspect = width/height; camera.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe($('#stage'));
 let visible = true;
@@ -40,7 +41,7 @@ const innerLips = new Set([78,95,88,178,87,14,317,402,318,324,308,415,310,311,31
 const openIndices = [];
 for (let i=0;i<topology.indices.length;i+=3) { const triangle = topology.indices.slice(i,i+3); if (!triangle.every(v => innerLips.has(v))) openIndices.push(...triangle); }
 geometry.setIndex(openIndices); geometry.setAttribute('uv',new THREE.Float32BufferAttribute(topology.uv.flat(),2));
-setPositions(topology.positions); deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
+setPositions(topology.positions); wire.visible = false; deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
 status('468 landmarks / 880 triangles / open inner lips. Rotate the mesh, or take a picture to map your face onto it.');
 
 async function ensureLandmarker() {
@@ -85,7 +86,7 @@ async function applyPhoto(source) {
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(landmarks.slice(0,468).flatMap(p => [p.x,1-p.y]),2));
     photoTexture?.dispose(); photoTexture = new THREE.CanvasTexture(canvas); photoTexture.colorSpace = THREE.SRGBColorSpace;
     material.map = photoTexture; material.color.set(0xffffff); material.needsUpdate = true;
-    hasPhoto = true; $('#texture').checked = true; $('#read').disabled = false;
+    hasPhoto = true; $('#texture').checked = true; $('#read').disabled = false; $('#fit').disabled = false;
     resetShape(); stopCamera();
     status('Your photograph is now the UV texture. Change the geometry, then re-read the expression.');
     readExpression();
@@ -93,30 +94,66 @@ async function applyPhoto(source) {
   finally { $('#upload').disabled = false; $('#capture').disabled = !stream; }
 }
 function resetShape() {
-  ['#smile','#jaw','#brow'].forEach(id => $(id).value = 0);
+  shapeExtras = {}; selectedTarget = 'neutral';
+  ['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).value = 0);
   camera.position.set(0,0,34); controls.target.set(0,0,0); controls.update();
   mesh.rotation.set(0,0,0); wire.rotation.set(0,0,0); deform();
 }
 function point(index) { return [basePositions[index*3],basePositions[index*3+1]]; }
 function deform() {
   if (!basePositions) return;
-  const smile = Number($('#smile').value), jaw = Number($('#jaw').value), brow = Number($('#brow').value);
-  const left = point(61), right = point(291), browL = point(70), browR = point(300), mouth = point(14);
+  const smile = Number($('#smile').value), jaw = Number($('#jaw').value), brow = Number($('#brow').value), eyes = Number($('#eyes').value), furrow = Number($('#furrow').value), nose = Number($('#nose').value);
+  const {innerBrow=0,cheek=0,mouthWide=0,lipPress=0} = shapeExtras;
+  const left = point(61), right = point(291), mouth = point(14);
+  const browL = point(70), browR = point(300), innerL=point(107), innerR=point(336), cheekL=point(50), cheekR=point(280);
   const gaussian = (x,y,p,s) => Math.exp(-((x-p[0])**2+(y-p[1])**2)/(2*s*s));
+  const eyeTop = new Set([159,158,157,160,161,246,386,385,384,387,388,466]);
+  const eyeBottom = new Set([145,144,153,154,155,163,374,373,380,381,382,390]);
+  const upperLip = new Set([13,82,81,80,191,312,311,310,415,0,37,39,40,185,267,269,270,409]);
   const attr = geometry.attributes.position;
   for (let i=0;i<attr.count;i++) {
     let x = basePositions[i*3], y = basePositions[i*3+1], z = basePositions[i*3+2];
-    const corners = gaussian(x,y,left,1.3)+gaussian(x,y,right,1.3);
-    const jawWeight = THREE.MathUtils.clamp((mouth[1]-y+1)/5,0,1)*Math.exp(-(((x-mouth[0])/6)**2));
-    y += smile*.95*corners + brow*.9*(gaussian(x,y,browL,1.5)+gaussian(x,y,browR,1.5)) - jaw*2*jawWeight;
-    if (innerLips.has(i)) { const upper = [13,82,81,80,191,312,311,310,415].includes(i); y += upper ? jaw*.3 : -jaw*.65; }
-    x += smile*.2*Math.sign(x-mouth[0])*corners; z -= jaw*.3*jawWeight;
-    attr.setXYZ(i,x,y,z);
+    const corners = gaussian(x,y,left,1.05)+gaussian(x,y,right,1.05);
+    const outerBrows = gaussian(x,y,browL,.9)+gaussian(x,y,browR,.9);
+    const innerBrows = gaussian(x,y,innerL,.65)+gaussian(x,y,innerR,.65);
+    const jawWeight = THREE.MathUtils.clamp((mouth[1]-y+.4)/4,0,1)*Math.exp(-(((x-mouth[0])/4.5)**2));
+    y += smile*1.25*corners + brow*.8*outerBrows + innerBrow*.95*innerBrows - furrow*.85*innerBrows - jaw*1.7*jawWeight;
+    x += (smile*.25 + mouthWide*.55)*Math.sign(x-mouth[0])*corners;
+    x -= furrow*.25*Math.sign(x)*innerBrows;
+    y += cheek*.45*(gaussian(x,y,cheekL,1)+gaussian(x,y,cheekR,1));
+    if (eyeTop.has(i)) y += eyes*.45;
+    if (eyeBottom.has(i)) y -= eyes*.3;
+    if (upperLip.has(i)) y += nose*.5;
+    z += nose*.2*gaussian(x,y,point(4),1.1);
+    if (innerLips.has(i)) {
+      const upper = upperLip.has(i);
+      y += upper ? jaw*.35 : -jaw*.6;
+      const restCenter = (basePositions[13*3+1]+basePositions[14*3+1])/2;
+      y += lipPress*(restCenter-basePositions[i*3+1])*.7;
+    }
+    z -= jaw*.2*jawWeight; attr.setXYZ(i,x,y,z);
   }
-  const a = new THREE.Vector3().fromBufferAttribute(attr,13), b = new THREE.Vector3().fromBufferAttribute(attr,14);
-  const l = new THREE.Vector3().fromBufferAttribute(attr,78), r = new THREE.Vector3().fromBufferAttribute(attr,308);
-  cavity.position.copy(a).add(b).multiplyScalar(.5); cavity.position.z -= .45;
-  cavity.scale.set(Math.max(.3,l.distanceTo(r)*.55),Math.max(.12,a.distanceTo(b)*.65),.6);
+  // A recessed surface follows the actual aperture boundary; it never bulges through the lips.
+  const lipLoop = [...innerLips]; const vertices = [], center = new THREE.Vector3();
+  lipLoop.forEach(i => center.add(new THREE.Vector3().fromBufferAttribute(attr,i)));center.multiplyScalar(1/lipLoop.length);center.z -= .8;
+  vertices.push(center.x,center.y,center.z);
+  lipLoop.forEach(i => { const p = new THREE.Vector3().fromBufferAttribute(attr,i);vertices.push(p.x,p.y,p.z-.3); });
+  const indices = [];for(let i=0;i<lipLoop.length;i++) indices.push(0,i+1,(i+1)%lipLoop.length+1);
+  cavity.geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));cavity.geometry.setIndex(indices);cavity.geometry.computeBoundingSphere();
+  const uv = geometry.attributes.uv, centerUV = new THREE.Vector2();lipLoop.forEach(i=>centerUV.add(new THREE.Vector2().fromBufferAttribute(uv,i)));centerUV.multiplyScalar(1/lipLoop.length);
+  cavity.geometry.setAttribute('uv',new THREE.Float32BufferAttribute([centerUV.x,centerUV.y,...lipLoop.flatMap(i=>[uv.getX(i),uv.getY(i)])],2));
+  const interiorMap = hasPhoto && jaw < .08 && $('#texture').checked ? photoTexture : null;
+  if(cavity.material.map!==interiorMap){cavity.material.map=interiorMap;cavity.material.needsUpdate=true;}
+  cavity.material.color.set(interiorMap ? 0xffffff : 0x241619);
+  const lipTop = new THREE.Vector3().fromBufferAttribute(attr,13), lipBottom = new THREE.Vector3().fromBufferAttribute(attr,14);
+  const lipLeft = new THREE.Vector3().fromBufferAttribute(attr,78), lipRight = new THREE.Vector3().fromBufferAttribute(attr,308);
+  const gap = Math.max(0,lipTop.y-lipBottom.y);
+  teeth.visible = smile > .25 && gap > .18;
+  if (teeth.visible) {
+    const x0=lipLeft.x*.83+lipRight.x*.17,x1=lipRight.x*.83+lipLeft.x*.17;
+    const top=lipTop.y-.04,bottom=top-Math.min(.42,gap*.45),z=Math.min(lipTop.z,lipBottom.z)-.18;
+    teeth.geometry.setAttribute('position',new THREE.Float32BufferAttribute([x0,top,z,x1,top,z,x1,bottom,z,x0,bottom,z],3));teeth.geometry.setIndex([0,1,2,0,2,3]);teeth.geometry.computeBoundingSphere();
+  }
   attr.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   $('#reading').textContent = hasPhoto ? 'Geometry changed. Press Re-read expression to measure it.' : 'Take a picture to compare model scores.';
 }
@@ -129,7 +166,8 @@ function engineTarget() {
   return localEngine.ready.then(() => localEngine.contentWindow);
 }
 async function readExpression() {
-  if (!hasPhoto) return;
+  if (!hasPhoto) return [];
+  if (pendingReads.size) { queuedRead = true; return []; }
   const id = 'mesh-'+Date.now()+'-'+(++requestNumber); $('#read').disabled = true;
   $('#reading').textContent = 'Reading the rendered face with the expression classifier…';
   try {
@@ -138,6 +176,7 @@ async function readExpression() {
     const oldSize = renderer.getSize(new THREE.Vector2()), oldRatio = renderer.getPixelRatio();
     renderer.setPixelRatio(1); renderer.setSize(480,480,false); renderer.render(scene,frontCamera);
     const image = renderer.domElement.toDataURL('image/jpeg',.9);
+    $('#model-view img').src=image;$('#model-view').hidden=false;
     renderer.setPixelRatio(oldRatio); renderer.setSize(oldSize.x,oldSize.y,false); mesh.rotation.copy(oldRotation); wire.visible = showWire; renderer.render(scene,camera);
     const target = await engineTarget();
     const reply = new Promise((resolve,reject) => { const timer = setTimeout(() => { pendingReads.delete(id); reject(new Error('The expression model is still loading. Please try again.')); },60000); pendingReads.set(id,{resolve,reject,timer}); });
@@ -147,8 +186,9 @@ async function readExpression() {
     scores.forEach(score => { const row = document.createElement('div'), name = document.createElement('span'), value = document.createElement('span'); name.textContent = score.label; value.textContent = Math.round(score.score*100)+'%'; row.append(name,value); $('#scores').append(row); });
     const top = scores.reduce((a,b) => b.score > (a?.score ?? -1) ? b : a,null);
     $('#reading').textContent = top ? top.label+' / '+Math.round(top.score*100)+'% model score' : 'No face recognized in this rendering. Try a smaller deformation.';
+    return scores;
   } catch(error) { $('#reading').textContent = error.message; }
-  finally { $('#read').disabled = false; }
+  finally { $('#read').disabled = false; if (queuedRead && !fitting) {queuedRead = false;setTimeout(readExpression,50);} }
 }
 window.addEventListener('message',event => {
   if (event.origin !== location.origin || (event.source !== parent && event.source !== localEngine?.contentWindow)) return;
@@ -170,21 +210,60 @@ $('#upload').addEventListener('change',async () => {
 });
 $('#reset').addEventListener('click',resetShape);
 $('#read').addEventListener('click',readExpression);
-['#smile','#jaw','#brow'].forEach(id => $(id).addEventListener('input',deform));
+['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).addEventListener('input',deform));
+['#smile','#jaw','#brow','#eyes','#furrow','#nose'].forEach(id => $(id).addEventListener('change',() => {if(hasPhoto && !fitting)readExpression();}));
 $('#wire').addEventListener('change',() => wire.visible = $('#wire').checked);
-$('#texture').addEventListener('change',() => { material.map = $('#texture').checked ? photoTexture : null; material.color.set(material.map ? 0xffffff : 0xe5e5e5); material.needsUpdate = true; });
+$('#texture').addEventListener('change',() => { material.map = $('#texture').checked ? photoTexture : null; material.color.set(material.map ? 0xffffff : 0xe5e5e5); material.needsUpdate = true; deform(); });
 window.addEventListener('pagehide',() => { stopCamera(); landmarker?.close(); renderer.dispose(); photoTexture?.dispose(); });
 document.addEventListener('keydown',event => { if (parent !== window && !event.target.closest('input,button,select') && ['ArrowLeft','ArrowRight'].includes(event.key)) { event.preventDefault(); parent.postMessage({type:'affective-nav',direction:event.key === 'ArrowRight' ? 'next' : 'previous'},location.origin); } });
 
-const shapes = {neutral:[0,0,0],happy:[1,.18,.2],sad:[-.8,.03,.55],angry:[-.35,.08,-.9],fearful:[-.2,.65,.9],disgusted:[-.65,.18,-.4],surprised:[0,1,1]};
+const shapes = {
+ neutral:{values:[0,0,0,0,0,0],extra:{}},
+ happy:{values:[1,.12,.05,-.6,0,0],extra:{cheek:1,mouthWide:.4}},
+ sad:{values:[-.8,0,-.25,-.15,0,0],extra:{innerBrow:.85,lipPress:.3}},
+ angry:{values:[-.25,0,-.25,-.5,1,0],extra:{lipPress:.8}},
+ fearful:{values:[-.2,.4,.45,.8,.2,0],extra:{innerBrow:.7,mouthWide:.8}},
+ disgusted:{values:[-.35,.06,-.1,-.45,.45,1],extra:{cheek:.3,lipPress:.25}},
+ surprised:{values:[0,.9,.9,1,0,0],extra:{innerBrow:.4,mouthWide:-.25}}
+};
+const controlIDs = ['#smile','#jaw','#brow','#eyes','#furrow','#nose'];
 let presetTimer;
+function applyPreset(label,scale=1) {const preset=shapes[label];shapeExtras=Object.fromEntries(Object.entries(preset.extra).map(([k,v])=>[k,v*scale]));controlIDs.forEach((id,i)=>$(id).value=preset.values[i]*scale);deform();}
 function renderPresets(labels) {
   $('#presets').replaceChildren();
   labels.filter(label => shapes[label]).forEach(label => {
-    const button = document.createElement('button'); button.textContent = label;button.type = 'button';button.setAttribute('aria-pressed','false');
-    button.onclick = () => { $('#presets').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed',String(b===button)));['#smile','#jaw','#brow'].forEach((id,i) => $(id).value = shapes[label][i]);deform();clearTimeout(presetTimer);if (hasPhoto) presetTimer = setTimeout(() => { if (!$('#read').disabled) readExpression(); },250); };
+    const button = document.createElement('button');button.textContent=label;button.type='button';button.setAttribute('aria-pressed','false');
+    button.onclick=()=>{if(fitting)return;selectedTarget=label;$('#presets').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyPreset(label);clearTimeout(presetTimer);if(hasPhoto)presetTimer=setTimeout(readExpression,220);};
     $('#presets').append(button);
   });
 }
+$('#fit').onclick=async()=>{
+  if (!hasPhoto || fitting || pendingReads.size) return;
+  fitting=true;$('#fit').disabled=true;
+  const target=selectedTarget;let bestScore=-1,bestScale=1,bestValues;
+  const controls=[...document.querySelectorAll('.fine-controls input')];controls.forEach(el=>el.disabled=true);
+  try {
+    for (const scale of [.45,.7,1]) {
+      applyPreset(target,scale);status('Testing '+target+' shape / intensity '+Math.round(scale*100)+'%…');
+      const scores=await readExpression();const score=scores?.find(s=>s.label===target)?.score ?? -1;
+      if(score>bestScore){bestScore=score;bestScale=scale;}
+    }
+    applyPreset(target,bestScale);bestValues=controlIDs.map(id=>Number($(id).value));
+    // Keep only changes that improve the actual requested class score for this photograph.
+    for(let i=0;i<controlIDs.length;i++) {
+      const original=bestValues[i],input=$(controlIDs[i]);
+      for(const direction of [-1,1]) {
+        const candidate=Math.max(Number(input.min),Math.min(Number(input.max),original+direction*.3));
+        if(candidate===original)continue;
+        controlIDs.forEach((id,j)=>$(id).value=j===i?candidate:bestValues[j]);deform();
+        status('Fitting '+target+' / '+input.parentElement.textContent.trim()+'…');
+        const scores=await readExpression(),score=scores?.find(s=>s.label===target)?.score ?? -1;
+        if(score>bestScore){bestScore=score;bestValues[i]=candidate;}
+      }
+    }
+    controlIDs.forEach((id,i)=>$(id).value=bestValues[i]);deform();await readExpression();
+    status('Best tested '+target+' score: '+Math.round(Math.max(0,bestScore)*100)+'%. Geometry, photograph and model can disagree.');
+  } finally {fitting=false;queuedRead=false;$('#fit').disabled=false;controls.forEach(el=>el.disabled=false);}
+};
 // Populate from the classifier's exported label list, including standalone mode.
 const labelEngine = await engineTarget();labelEngine.postMessage({type:'affective-labels-request'},location.origin);

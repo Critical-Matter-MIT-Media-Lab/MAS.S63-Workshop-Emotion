@@ -53,7 +53,7 @@ async function startCamera() {
     video.size(480,360); video.elt.style.width = '100%'; video.elt.style.height = '100%'; video.parent('camera'); await video.elt.play();
     if (token !== generation) { stream.getTracks().forEach(t => t.stop()); return; }
     faceapi.video = video.elt;
-    running = true; document.querySelector('#dock-stop').hidden = !document.body.classList.contains('docked'); setLiveRunning(true); statusText('Model ready. Try an expression.');
+    running = true; document.querySelector('#dock-stop').hidden = true; setLiveRunning(true); statusText('Model ready. Try an expression.');
     detect(token);
   } catch(error) { stopCamera(); statusText('Could not start: '+error.message); }
 }
@@ -145,7 +145,7 @@ function frameImage(square) {
 window.addEventListener('message',async event => {
   if (event.origin !== location.origin || event.source !== parent) return;
   const data = event.data;
-  if (data?.type === 'affective-camera-layout') { document.body.classList.toggle('docked',data.docked); document.querySelector('#dock-stop').hidden = !data.docked || !running; }
+  if (data?.type === 'affective-camera-layout') { document.body.classList.toggle('docked',data.docked); document.body.classList.toggle('transitioning',!!data.transitioning); document.querySelector('#dock-stop').hidden = true; }
   if (data?.type === 'affective-labels-request') {
     await ensureModel(); parent.postMessage({type:'affective-model-labels',labels:names},location.origin);
   }

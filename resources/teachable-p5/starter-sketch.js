@@ -1,51 +1,69 @@
-// Paste this complete sketch into the p5 editor and replace MODEL_URL.
-// Model libraries load automatically. Keep the editor's existing p5 script.
+// ML5 Model Loader Sketch / custom Teachable Machine image models.
+// In the p5 editor, replace all of sketch.js with this file.
+// Paste your exported URL on the next line. No extra script tags are needed.
 const MODEL_URL = 'PASTE_YOUR_TEACHABLE_MACHINE_MODEL_URL_HERE/';
-let model, webcam, ready = false, starting = false, label = 'Click to start';
+let model, video, ready = false, starting = false, generation = 0, message;
+const modelInput = document.createElement('canvas');
+modelInput.width = modelInput.height = 224;
 function setup() {
-  createCanvas(400,450);
+  createCanvas(640,480); // A regular 4:3 webcam view, with no square display crop.
   createButton('Start camera').mousePressed(startModel);
   createButton('Stop camera').mousePressed(stopModel);
+  message = createP('Paste MODEL_URL above, then start the camera.');
 }
 function loadLibrary(url) {
   return new Promise((resolve,reject) => {
-    const script = document.createElement('script'); script.src = url;
-    script.onload = resolve; script.onerror = () => reject(new Error('Could not load '+url));
+    const script = document.createElement('script');script.src = url;
+    script.onload = resolve;script.onerror = () => reject(new Error('Could not load '+url));
     document.head.append(script);
   });
 }
 async function startModel() {
   if (ready || starting) return;
-  starting = true;
+  const token = ++generation;starting = true;
   try {
-    label = 'Loading model libraries…';
+    message.html('Loading model libraries…');
     if (!window.tf) await loadLibrary('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js');
     if (!window.tmImage) await loadLibrary('https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.3/dist/teachablemachine-image.min.js');
-    if (MODEL_URL.includes('PASTE_')) throw new Error('Replace MODEL_URL with your exported image model URL.');
+    if (MODEL_URL.includes('PASTE_')) throw new Error('Replace MODEL_URL near the top of sketch.js.');
     const base = MODEL_URL.replace(/\/+$/,'')+'/';
     if (!model) model = await window.tmImage.load(base+'model.json',base+'metadata.json');
-    webcam = new window.tmImage.Webcam(400,400,true);
-    await webcam.setup(); await webcam.play(); ready = true;
-    predict();
-  } catch(error) { label = error.message; webcam?.stop(); }
-  finally { starting = false; }
+    if (token !== generation) return;
+    const stream = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480}},audio:false});
+    if (token !== generation) {stream.getTracks().forEach(t => t.stop());return;}
+    video = createVideo([]);video.elt.srcObject = stream;video.elt.muted = true;video.elt.playsInline = true;video.hide();
+    await video.elt.play();
+    if (token !== generation) return;
+    // Keep the entire webcam view, including widescreen cameras.
+    resizeCanvas(640,Math.round(640*video.elt.videoHeight/video.elt.videoWidth));
+    ready = true;predict(token);
+  } catch(error) {stopModel();message.elt.textContent = error.message;}
+  finally {starting = false;}
 }
-function stopModel() { ready = false; webcam?.stop(); label = 'Camera off'; }
+function stopModel() {
+  generation++;ready = false;
+  video?.elt.srcObject?.getTracks().forEach(t => t.stop());video?.remove();video = null;
+  if (message) message.elt.textContent = 'Camera off';
+}
 function draw() {
-  background(255);
-  if (ready) { webcam.update(); drawingContext.drawImage(webcam.canvas,0,0,400,400); }
-  fill(0); noStroke(); textSize(18); text(label,12,430);
+  background(238);
+  if (ready && video?.elt.readyState >= 2) {
+    push();translate(width,0);scale(-1,1);image(video,0,0,width,height);pop();
+  }
 }
-async function predict() {
-  if (!ready) return;
+async function predict(token) {
+  if (!ready || token !== generation) return;
   try {
-    // Predict only the webcam canvas, so the label text is not part of the input.
-    webcam.update();
-    const predictions = await model.predict(webcam.canvas);
-    if (!ready) return;
+    // Only the model input uses TM's square center crop; the displayed webcam stays complete.
+    const el = video.elt,side = Math.min(el.videoWidth,el.videoHeight),ctx = modelInput.getContext('2d');
+    ctx.setTransform(-1,0,0,1,224,0);
+    ctx.drawImage(el,(el.videoWidth-side)/2,(el.videoHeight-side)/2,side,side,0,0,224,224);
+    const predictions = await model.predict(modelInput);
+    if (!ready || token !== generation) return;
     const best = predictions.reduce((a,b) => a.probability > b.probability ? a : b);
-    label = best.className+' / '+Math.round(best.probability*100)+'%';
-    setTimeout(predict,100);
-  } catch(error) { label = error.message; ready = false; webcam.stop(); }
+    message.elt.textContent = best.className+' / '+Math.round(best.probability*100)+'%';
+    // Use best.className or best.probability to control your own p5.js drawing.
+    setTimeout(() => predict(token),100);
+  } catch(error) {stopModel();message.elt.textContent = error.message;}
 }
-window.addEventListener('pagehide', () => { ready = false; webcam?.stop(); });
+window.addEventListener('pagehide',stopModel);
