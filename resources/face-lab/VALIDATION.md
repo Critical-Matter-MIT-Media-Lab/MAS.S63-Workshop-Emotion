@@ -1,4 +1,6 @@
-# Mesh fitting validation
+# Historical mesh fitting validation
+
+**Previous rig only:** these results used artificial eye, teeth and mouth surfaces that have since been removed. They are not validation results for the current photo-only rig.
 
 15 October 2026. Headless Microsoft Edge, 1299 × 1012 presentation viewport. Five external QA portraits; fixtures are not distributed in this workshop. Each label button was selected after mapping each photo. Results below are rounded, actual classifier outputs after automatic fitting, using the unchanged pretrained model. All 35 cases retained face detection, placed the requested label first, and exceeded 80%.
 

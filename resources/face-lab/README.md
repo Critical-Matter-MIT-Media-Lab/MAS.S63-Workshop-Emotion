@@ -1,45 +1,27 @@
 # Face mesh and photo UV exercise
 
-Serve the workshop folder on localhost and open this folder's index.html, or use the face-mesh slide. Rotate the canonical face by dragging and zoom with the mouse wheel. Start the camera and take a front-facing picture, or select an image file. Photos remain in browser memory. A captured photo stops the camera automatically.
+Open the face-mesh slide, or serve the workshop on localhost and open this folder’s `index.html`. Drag to rotate and scroll to zoom. Take a frontal picture or select a photo. Images remain in browser memory; taking a picture stops the camera.
 
-MediaPipe Face Landmarker detects facial landmarks in the image. The first 468 landmarks become vertices of a triangle mesh. Their image coordinates become UV coordinates, so the captured photograph maps onto that geometry. The canonical topology has 898 triangles.
+MediaPipe detects 468 facial landmarks. These become mesh vertices, and their image coordinates map the photograph onto the face. The eye appearance comes from that photograph. Inner-lip triangles are removed for an open mouth aperture, with no added mouth backing, generated teeth or procedural eyeballs.
 
-Use mouth corners, jaw, brow lift, eyelid aperture, brow furrow, and nose / upper-lip controls to deform the mesh. Presets also coordinate cheek lift, lip tension, inner-brow motion, and mouth width. They are illustrative geometric edits, not trained emotional states. Re-read expression sends a front-facing render, without wireframe lines, through the workshop's expression classifier. Results are actual model scores. A large edit can cause face detection to fail, which the interface reports. The classifier reads pixels, while the landmark model supplies a separate geometric representation.
+## Controls and emotion buttons
 
-The deck preloads and shares the expression model. The standalone lab creates its own hidden expression page. Only one webcam runs at a time in the deck. Start controls always require a deliberate click.
+Twenty-one controls are grouped into Mouth, Brows, Eyes, Nose and Reference tabs. They adjust mouth corners, jaw, width, lip pressure, pucker, brows, eyelids, cheeks, nose, lips, wrinkles, sneer, chin, source-pose normalization, perspective, skin detail and lighting. Source normalization blends the captured landmarks toward an aligned neutral reference. Skin normalization locally blends a blurred version of the same photo.
 
-Dependencies: Three.js 0.180.0, MediaPipe Tasks Vision 0.10.21, the bundled Face Landmarker model, and the original expression-enabled ml5 build. The first two libraries and the MediaPipe WebAssembly runtime load from jsDelivr. A network connection is required.
+An emotion button first applies a fixed geometric preset. The unchanged pretrained classifier then reads a frontal rendering. If the target score is weak, automatic fitting adjusts the controls, tests combinations including deterministic pseudo-random variations, and keeps the face-detected candidate with the highest actual target score. This is a guided search over slider values. The classifier reads images; it does not generate the mesh or convert emotion names into facial movements.
 
-MediaPipe canonical geometry: https://github.com/google-ai-edge/mediapipe/tree/master/mediapipe/modules/face_geometry/data
+The search aims for 90%; results below 80% or with a different winning label are reported as unsuccessful. Difficult fits may take tens of seconds. Select another label to cancel. Fitted poses are reused for the current photo and cleared on reset or a new photo. Manual controls and **Read model** remain available.
 
-Face Landmarker guide: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js
+The **Model input** thumbnail shows the frontal image sent to the classifier. Scores and model weights are unchanged. Fitting optimizes agreement with that classifier and does not establish someone’s emotional state. Photo texture, lighting and synthetic deformations can affect recognition. Historical validation results from the earlier rig used artificial surfaces and do not describe this revision.
 
-MediaPipe data and model are Apache 2.0 licensed. See MEDIAPIPE-LICENSE. Three.js is MIT licensed: https://github.com/mrdoob/three.js/blob/dev/LICENSE
+## Dependencies
 
-## Expression presets and mouth geometry
+The original expression-enabled ml5 teaching build, p5.js and FaceAPI weights are bundled locally. Model provenance is in `../p5-expression/models/SOURCE.md`; runtime licenses are in `../shared/vendor/`. The deck preloads and shares the model; standalone mode loads a hidden expression page.
 
-The buttons use labels exported by the preloaded expression classifier. They apply approximate geometric presets, not inversions learned from the classifier. With a photo mapped, a preset requests an actual classifier reading of the frontal rendering. Fine adjustments remain available. The 18 triangles covering the inner lips are removed, leaving a mouth aperture with a recessed interior following its boundary. A small upper-teeth surface appears for open smiles; the former protruding sphere is removed.
+Three.js 0.180.0 and MediaPipe Tasks Vision 0.10.21 with its WebAssembly runtime load from jsDelivr. A network connection is required. The Face Landmarker model is bundled.
 
-## Compare a target with the measured prediction
+- [MediaPipe geometry](https://github.com/google-ai-edge/mediapipe/tree/master/mediapipe/modules/face_geometry/data)
+- [Face Landmarker guide](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js)
+- [Three.js MIT license](https://github.com/mrdoob/three.js/blob/dev/LICENSE)
 
-The label buttons choose approximate shapes. They do not assign the classifier result. The model-input thumbnail shows the exact frontal image sent to the classifier, with the wire overlay removed. Scores are unmodified model outputs.
-
-Fit target measures preset strengths, individual controls, coordinated movements and a population of candidate poses against the unchanged classifier. It retains the highest measured target score among candidates with a detected face. This optimizes agreement with this classifier, not emotional truth. It may still classify a target as neutral or another label.
-
-A photograph retains its original mouth appearance, eye texture, and lighting as the geometry moves. Consequently a smiling photograph can still read as happy after an angry preset, and a neutral photograph can remain neutral after a small edit. Start from a clear, evenly lit frontal photo. The classifier reads the rendered pixels; it does not know which preset was selected and was not trained specifically on these synthetic mesh edits.
-
-The lab fits inside its slide. Twenty-three controls are grouped into Mouth, Brows, Eyes, Nose and Reference tabs. These include independent inner/outer brows, brow angle, eyelid aperture, cheek lift, upper/lower lip movement, lip pressure, pucker, teeth reveal, one-sided sneer, nose wrinkles, chin raise, source-pose normalization, eye-surface reconstruction, perspective, skin-detail normalization and surface lighting. Source normalization blends detected landmarks toward an aligned neutral reference. The eye reconstruction and teeth are illustrative surfaces, rather than recovered anatomy. Skin normalization blends a blurred version of the same photograph locally; no replacement face image is used.
-
-The original expression model weights and teaching runtimes are bundled in the workshop. The model files are checked against the upstream repository's Git blob hashes; see `../p5-expression/models/SOURCE.md`. No weights or output scores are modified. Three.js and the MediaPipe runtime still require a network connection.
-
-The sad preset uses a smaller, localized mouth-corner movement. Angry combines brow lowering/furrowing and lip tension; disgusted adds localized nose and upper-lip movement with chin lift. Fearful combines inner-brow motion, wider eyelids and horizontal mouth stretch. If a selected preset loses face detection, the lab tests reduced strengths to restore it. Scores still come from the unchanged classifier; selecting a preset never forces its output label.
-
-Weak sad, angry, fearful and disgusted presets automatically run the same measured fitting search. Fitted controls are reused for that photo and cleared on reset or a new photo. This calibration maximizes the chosen classifier score for the synthetic rendering; it does not validate the emotion label or alter the model weights.
-
-## Measurement queue and unsuccessful fits
-
-Every selected preset now waits for the preceding measurement; a newer selection cancels an older fit. Old scores clear immediately when geometry changes. The fitting search includes the current pose, the undeformed photo mesh, five preset strengths, the six visible controls, and coordinated inner-brow, cheek, mouth-width, lip-tension and chin movements. It retains only measured, face-detected candidates. All labels receive recovery and fitting when needed, including surprised.
-
-The expanded search also compares original and normalized source poses, model perspective and eye reconstruction. A population search helps cross plateaus left by individual slider adjustments. It aims for a 90% target score; results below 80% or with a different winning label are explicitly reported as unsuccessful. Difficult photos can require tens of seconds. Select another label to cancel. Fitting modifies the rendering only and does not retrain the model.
-
-The selected target and actual model label appear separately. If the best detected candidate does not match the target confidently, the interface reports that no reliable match was found for that photo. A smiling photograph can retain smiling mouth and eye textures after geometric changes, so the rig cannot promise every class for every photograph. Use a neutral, frontal, evenly lit source image. The model-input thumbnail is restored with the best measured candidate, including cached readings.
+MediaPipe data and model use Apache 2.0; see `MEDIAPIPE-LICENSE`.

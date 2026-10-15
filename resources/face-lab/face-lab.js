@@ -24,13 +24,11 @@ material.onBeforeCompile=shader=>{
   material.userData.rigUniforms=shader.uniforms;
 };
 const mesh = new THREE.Mesh(geometry,material); scene.add(mesh);
-const cavity = new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0x241619,side:THREE.DoubleSide})); mesh.add(cavity);
-const teeth = new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0xeee8dc,side:THREE.DoubleSide}));mesh.add(teeth);
 const wire = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0x444444,wireframe:true,transparent:true,opacity:.45,depthWrite:false})); scene.add(wire);
 let basePositions, capturedPositions, neutralPositions, photoTexture, blurredTexture, landmarker, landmarkPromise, stream, hasPhoto = false, cameraToken = 0, requestNumber = 0;
 const pendingReads = new Map();
 const calibratedPresets = new Map();
-const extraRanges={innerBrow:[-1,1],cheek:[-1,1],mouthWide:[-1,1],lipPress:[0,1],chinRaise:[0,1],upperLip:[-1,1],lowerLip:[-1,1],lipRound:[0,1],teethReveal:[0,1],browAngle:[-1,1],noseWrinkle:[0,1],neutralize:[0,1],eyeRebuild:[0,1],sneer:[-1,1],projection:[0,1],albedoSmooth:[0,1],lighting:[0,1]};
+const extraRanges={innerBrow:[-1,1],cheek:[-1,1],mouthWide:[-1,1],lipPress:[0,1],chinRaise:[0,1],upperLip:[-1,1],lowerLip:[-1,1],lipRound:[0,1],browAngle:[-1,1],noseWrinkle:[0,1],neutralize:[0,1],sneer:[-1,1],projection:[0,1],albedoSmooth:[0,1],lighting:[0,1]};
 function setExtras(extra={}){shapeExtras={...extra};for(const key of Object.keys(extraRanges)){const input=document.querySelector('#rig-'+key);if(input)input.value=extra[key]||0;}}
 let localEngine, selectedTarget = 'neutral', shapeExtras = {}, fitting = false;
 let selectionVersion=0, selectionWork=Promise.resolve(), shapeVersion=0;
@@ -54,16 +52,8 @@ function setPositions(positions) {
 const topology = await (await fetch('canonical-face.json')).json();
 // Remove the triangles spanning the inner lips, leaving a real mouth aperture.
 const innerLips = new Set([78,95,88,178,87,14,317,402,318,324,308,415,310,311,312,13,82,81,80,191]);
-const eyeLoops=[[33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246],[263,249,390,373,374,380,381,382,362,398,384,385,386,387,388,466]];
-const eyeSets=eyeLoops.map(loop=>new Set(loop));
-const eyeMeshes=eyeLoops.map(()=>{
-  const material=new THREE.ShaderMaterial({side:THREE.DoubleSide,uniforms:{photo:{value:null},usePhoto:{value:0},rebuild:{value:0},eyeAspect:{value:1},irisColor:{value:new THREE.Color(.22,.13,.07)}},vertexShader:`varying vec2 eyeUV;varying vec2 photoUV;attribute vec2 photoUv;void main(){eyeUV=uv;photoUV=photoUv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform sampler2D photo;uniform float usePhoto;uniform float rebuild;uniform float eyeAspect;uniform vec3 irisColor;varying vec2 eyeUV;varying vec2 photoUV;void main(){vec2 p=(eyeUV-.5)*vec2(1.,eyeAspect);float radius=length(p);float angle=atan(p.y,p.x);float fiber=.85+.15*sin(angle*62.+radius*190.);vec3 iris=irisColor*fiber;vec3 color=mix(vec3(.94,.92,.90),iris,1.-smoothstep(.155,.17,radius));color=mix(vec3(.025),color,smoothstep(.055,.07,radius));float glint=1.-smoothstep(.012,.025,length(p-vec2(-.035,.04)));color=mix(color,vec3(1.),glint*.85);vec3 original=texture2D(photo,photoUV).rgb;gl_FragColor=vec4(mix(original,color,rebuild*usePhoto),1.);
-#include <colorspace_fragment>
-}`});
-  const eye=new THREE.Mesh(new THREE.BufferGeometry(),material);mesh.add(eye);return eye;
-});
 const openIndices = [];
-for (let i=0;i<topology.indices.length;i+=3) { const triangle = topology.indices.slice(i,i+3); if (!triangle.every(v => innerLips.has(v)) && !eyeSets.some(set=>triangle.every(v=>set.has(v)))) openIndices.push(...triangle); }
+for (let i=0;i<topology.indices.length;i+=3) { const triangle = topology.indices.slice(i,i+3); if (!triangle.every(v => innerLips.has(v))) openIndices.push(...triangle); }
 geometry.setIndex(openIndices); geometry.setAttribute('uv',new THREE.Float32BufferAttribute(topology.uv.flat(),2));
 setPositions(topology.positions); wire.visible = false; deform(); mesh.rotation.y = wire.rotation.y = -.18; resize();
 status('468 landmarks / editable eyes, brows, lips and nose. Rotate the mesh, or take a picture to map your face onto it.');
@@ -164,7 +154,7 @@ function deform() {
   if (!basePositions) return;
   const smile = Number($('#smile').value), jaw = Number($('#jaw').value), brow = Number($('#brow').value), eyes = Number($('#eyes').value), furrow = Number($('#furrow').value), nose = Number($('#nose').value);
   for(const key of Object.keys(extraRanges)){const input=$('#rig-'+key);if(input)shapeExtras[key]=Number(input.value);}
-  const {innerBrow=0,cheek=0,mouthWide=0,lipPress=0,chinRaise=0,upperLip:lipRaise=0,lowerLip=0,lipRound=0,teethReveal=0,browAngle=0,noseWrinkle=0,neutralize=0,eyeRebuild=0,sneer=0}=shapeExtras;
+  const {innerBrow=0,cheek=0,mouthWide=0,lipPress=0,chinRaise=0,upperLip:lipRaise=0,lowerLip=0,lipRound=0,browAngle=0,noseWrinkle=0,neutralize=0,sneer=0}=shapeExtras;
   if(hasPhoto && neutralPositions)for(let i=0;i<basePositions.length;i++)basePositions[i]=capturedPositions[i]+(neutralPositions[i]-capturedPositions[i])*neutralize;
   const left = point(61), right = point(291), mouth = point(14);
   const browL = point(105), browR = point(334), innerL=point(55), innerR=point(285), cheekL=point(50), cheekR=point(280);
@@ -210,42 +200,8 @@ function deform() {
     const folds=Math.max(gaussian(x,y,[left[0]-.2,left[1]+1],1),gaussian(x,y,[right[0]+.2,right[1]+1],1),gaussian(x,y,cheekL,1.3),gaussian(x,y,cheekR,1.3));
     const lipExclusion=gaussian(x,y,mouth,1.1);geometry.attributes.skinBlend.setX(i,Math.max(0,folds*(1-lipExclusion)));
   }
-  eyeLoops.forEach((loop,eyeIndex)=>{
-    const points=loop.map(i=>new THREE.Vector3().fromBufferAttribute(attr,i));
-    const center=points.reduce((sum,p)=>sum.add(p),new THREE.Vector3()).multiplyScalar(1/points.length);
-    const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x)),minY=Math.min(...points.map(p=>p.y)),maxY=Math.max(...points.map(p=>p.y));
-    const w=Math.max(.1,maxX-minX),h=Math.max(.05,maxY-minY),vertices=[center.x,center.y,center.z-.035],uvs=[(center.x-minX)/w,(center.y-minY)/h];
-    const sourceUV=geometry.attributes.uv,photoUV=[];
-    let u=0,v=0;loop.forEach(i=>{u+=sourceUV.getX(i);v+=sourceUV.getY(i);});photoUV.push(u/loop.length,v/loop.length);
-    points.forEach((p,j)=>{vertices.push(p.x,p.y,p.z-.035);uvs.push((p.x-minX)/w,(p.y-minY)/h);photoUV.push(sourceUV.getX(loop[j]),sourceUV.getY(loop[j]));});
-    const indices=[];for(let i=0;i<loop.length;i++)indices.push(0,i+1,(i+1)%loop.length+1);
-    const eye=eyeMeshes[eyeIndex];eye.geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));eye.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));eye.geometry.setAttribute('photoUv',new THREE.Float32BufferAttribute(photoUV,2));eye.geometry.setIndex(indices);eye.geometry.computeBoundingSphere();
-    eye.material.uniforms.photo.value=photoTexture;eye.material.uniforms.usePhoto.value=hasPhoto?1:0;eye.material.uniforms.rebuild.value=eyeRebuild;eye.material.uniforms.eyeAspect.value=h/w;
-    eye.visible=hasPhoto;
-  });
-  // A recessed surface follows the actual aperture boundary; it never bulges through the lips.
-  const lipLoop = [...innerLips]; const vertices = [], center = new THREE.Vector3();
-  lipLoop.forEach(i => center.add(new THREE.Vector3().fromBufferAttribute(attr,i)));center.multiplyScalar(1/lipLoop.length);center.z -= .8;
-  vertices.push(center.x,center.y,center.z);
-  lipLoop.forEach(i => { const p = new THREE.Vector3().fromBufferAttribute(attr,i);vertices.push(p.x,p.y,p.z-.3); });
-  const indices = [];for(let i=0;i<lipLoop.length;i++) indices.push(0,i+1,(i+1)%lipLoop.length+1);
-  cavity.geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));cavity.geometry.setIndex(indices);cavity.geometry.computeBoundingSphere();
-  const uv = geometry.attributes.uv, centerUV = new THREE.Vector2();lipLoop.forEach(i=>centerUV.add(new THREE.Vector2().fromBufferAttribute(uv,i)));centerUV.multiplyScalar(1/lipLoop.length);
-  cavity.geometry.setAttribute('uv',new THREE.Float32BufferAttribute([centerUV.x,centerUV.y,...lipLoop.flatMap(i=>[uv.getX(i),uv.getY(i)])],2));
-  const interiorMap = hasPhoto && jaw < .08 && neutralize<.35 && lipPress<.4 && $('#texture').checked ? photoTexture : null;
-  if(cavity.material.map!==interiorMap){cavity.material.map=interiorMap;cavity.material.needsUpdate=true;}
-  cavity.material.color.set(interiorMap ? 0xffffff : 0x241619);
-  const lipTop = new THREE.Vector3().fromBufferAttribute(attr,13), lipBottom = new THREE.Vector3().fromBufferAttribute(attr,14);
-  const lipLeft = new THREE.Vector3().fromBufferAttribute(attr,78), lipRight = new THREE.Vector3().fromBufferAttribute(attr,308);
-  const gap = Math.max(0,lipTop.y-lipBottom.y);
   geometry.attributes.color.needsUpdate=true;geometry.attributes.skinBlend.needsUpdate=true;
   const uniforms=material.userData.rigUniforms;if(uniforms){uniforms.rigBlur.value=blurredTexture;uniforms.rigSmooth.value=shapeExtras.albedoSmooth||0;uniforms.rigLighting.value=shapeExtras.lighting||0;}
-  teeth.visible = (smile > .25 || teethReveal>.1) && gap > .08;
-  if (teeth.visible) {
-    const x0=lipLeft.x*.83+lipRight.x*.17,x1=lipRight.x*.83+lipLeft.x*.17;
-    const top=lipTop.y-.04,bottom=top-Math.min(.55,gap*(.35+teethReveal*.5)),z=Math.min(lipTop.z,lipBottom.z)-.18;
-    teeth.geometry.setAttribute('position',new THREE.Float32BufferAttribute([x0,top,z,x1,top,z,x1,bottom,z,x0,bottom,z],3));teeth.geometry.setIndex([0,1,2,0,2,3]);teeth.geometry.computeBoundingSphere();
-  }
   shapeVersion++;$('#scores').replaceChildren();
   attr.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   $('#reading').textContent = hasPhoto ? 'Geometry changed. Press Re-read expression to measure it.' : 'Take a picture to compare model scores.';
@@ -331,10 +287,10 @@ document.addEventListener('keydown',event => { if (parent !== window && !event.t
 
 const shapes = {
  neutral:{values:[0,0,0,0,0,0],extra:{neutralize:1}},
- happy:{values:[1,.12,.05,-.6,0,0],extra:{cheek:1,mouthWide:.45,teethReveal:.8,neutralize:1}},
+ happy:{values:[1,.12,.05,-.6,0,0],extra:{cheek:1,mouthWide:.45,neutralize:1}},
  sad:{values:[-.38,0,-.12,-.08,.12,0],extra:{innerBrow:.6,chinRaise:.25,browAngle:-.4,neutralize:1}},
  angry:{values:[-.15,0,-.35,-.28,.9,0],extra:{lipPress:.9,chinRaise:.35,mouthWide:-.2,browAngle:.4,noseWrinkle:.15,neutralize:1}},
- fearful:{values:[-.12,.25,.3,.5,.45,0],extra:{innerBrow:.6,mouthWide:1,teethReveal:.5,lowerLip:.3,neutralize:1}},
+ fearful:{values:[-.12,.25,.3,.5,.45,0],extra:{innerBrow:.6,mouthWide:1,lowerLip:.3,neutralize:1}},
  disgusted:{values:[-.2,0,-.2,-.28,.4,.9],extra:{cheek:.3,lipPress:.15,chinRaise:.6,upperLip:.8,noseWrinkle:1,neutralize:1}},
  surprised:{values:[0,.9,.9,1,0,0],extra:{innerBrow:.5,mouthWide:-.3,lipRound:.4,neutralize:1}}
 };
@@ -390,19 +346,18 @@ async function fitTarget(token=selectionVersion) {
       }
     }
     if(!best){applyPreset(target,0);await readExpression();status('No recognizable face in the tested shapes. Take a clear frontal photo, then try again.');return;}
-    const priorities={neutral:['albedoSmooth','neutralize','smile','jaw','eyes','brow','lipPress'],happy:['smile','cheek','eyes','mouthWide','teethReveal','jaw'],sad:['smile','innerBrow','browAngle','brow','chinRaise','lipPress'],angry:['albedoSmooth','lighting','eyeRebuild','innerBrow','furrow','browAngle','brow','eyes','lipPress','chinRaise','mouthWide'],fearful:['innerBrow','browAngle','eyes','mouthWide','jaw','teethReveal'],disgusted:['sneer','upperLip','noseWrinkle','nose','chinRaise','smile','lowerLip'],surprised:['jaw','eyes','brow','innerBrow','mouthWide','lipRound']};
+    const priorities={neutral:['albedoSmooth','neutralize','smile','jaw','eyes','brow','lipPress'],happy:['smile','cheek','eyes','mouthWide','jaw'],sad:['smile','innerBrow','browAngle','brow','chinRaise','lipPress'],angry:['albedoSmooth','lighting','innerBrow','furrow','browAngle','brow','eyes','lipPress','chinRaise','mouthWide'],fearful:['innerBrow','browAngle','eyes','mouthWide','jaw',],disgusted:['sneer','upperLip','noseWrinkle','nose','chinRaise','smile','lowerLip'],surprised:['jaw','eyes','brow','innerBrow','mouthWide','lipRound']};
     const namedControls=['smile','jaw','brow','eyes','furrow','nose'];
     const parameters=[...controlIDs.map((id,i)=>({name:namedControls[i],i,min:Number($(id).min),max:Number($(id).max)})),...Object.entries(extraRanges).map(([key,[min,max]])=>({name:key,key,min,max}))];
     parameters.sort((a,b)=>{const rank=n=>(priorities[target].indexOf(n)+1)||100;return rank(a.name)-rank(b.name);});
     const strong={
-      angry:[{values:[-.3,0,0,.7,1,0],extra:{innerBrow:-1,browAngle:1,lipPress:1,cheek:-.7,neutralize:1,eyeRebuild:1,projection:1}},{values:[-.4,.15,-.5,.1,1,.2],extra:{innerBrow:-.8,browAngle:.8,lipPress:.7,teethReveal:.7,cheek:-.5,neutralize:1,eyeRebuild:1,projection:0}}],
-      neutral:[{values:[0,0,0,.1,0,0],extra:{lipPress:.8,cheek:-.8,neutralize:1,eyeRebuild:1,projection:1}}],
-      disgusted:[{values:[-.3,.1,-.1,-.2,.5,1],extra:{upperLip:1,lowerLip:-.3,chinRaise:1,sneer:.8,teethReveal:.6,noseWrinkle:1,neutralize:1,eyeRebuild:.5,projection:1}}]
+      angry:[{values:[-.3,0,0,.7,1,0],extra:{innerBrow:-1,browAngle:1,lipPress:1,cheek:-.7,neutralize:1,projection:1}},{values:[-.4,.15,-.5,.1,1,.2],extra:{innerBrow:-.8,browAngle:.8,lipPress:.7,cheek:-.5,neutralize:1,projection:0}}],
+      neutral:[{values:[0,0,0,.1,0,0],extra:{lipPress:.8,cheek:-.8,neutralize:1,projection:1}}],
+      disgusted:[{values:[-.3,.1,-.1,-.2,.5,1],extra:{upperLip:1,lowerLip:-.3,chinRaise:1,sneer:.8,noseWrinkle:1,neutralize:1,projection:1}}]
     };
     for(const candidate of strong[target]||[]){if(best.score>=.9)break;restore(candidate);await measure();}
     // Compare the neutralized and original source pose before the local search.
     for(const neutralize of [0,.5,1])for(const projection of [0,1]){if(best.score>=.9)break;restore(best);setExtras({...shapeExtras,neutralize,projection});deform();await measure();}
-    for(const eyeRebuild of [1,.5]){if(best.score>=.9)break;restore(best);setExtras({...shapeExtras,eyeRebuild});deform();await measure();}
     for(const step of [.4,.22,.12]){
       if(best.score>=.9)break;
       for(const parameter of parameters){
