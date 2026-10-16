@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Train + Test / Copy p5 sketch</title><style>body{max-width:960px;margin:32px auto;padding:0 20px;background:#f4f4f0;color:#171717;font:15px/1.5 Arial}pre{background:white;padding:24px;overflow:auto;font-size:12px}</style></head><body><h1>Train + Test / p5.js sketch</h1><p>Copy the complete code into sketch.js in a p5.js 1.x project. It includes its interface, styling and library loader.</p><p><a href="https://editor.p5js.org/jxke/sketches/_APDBCYwRn">Open training sketch</a></p><pre id="source">// Train and test two image labels in p5.js 1.x. No other workshop files needed.
+let video, features, classifier, loading;
+let counts=[0,0], running=false, starting=false, busy=false, training=false, testing=false, trained=false, generation=0;
+const $=s=&gt;document.querySelector(&#x27;#train-app &#x27;+s);
+const say=t=&gt;$(&#x27;#status&#x27;).textContent=t;
+const labels=()=&gt;[$(&#x27;#label-a&#x27;).value.trim(),$(&#x27;#label-b&#x27;).value.trim()];
+function setup(){
+  pixelDensity(1);frameRate(24);
+  const style=document.createElement(&#x27;style&#x27;);style.textContent=TRAIN_STYLE;document.head.append(style);
+  createDiv().id(&#x27;train-app&#x27;).html(`&lt;header&gt;&lt;small&gt;AFFECTIVE SENSING / P5.JS + ML5.JS&lt;/small&gt;&lt;h1&gt;Train. Test. Question.&lt;/h1&gt;&lt;p&gt;Name two visible patterns. Collect examples, train a model, then test something new.&lt;/p&gt;&lt;/header&gt;
+  &lt;div class=&quot;workspace&quot;&gt;&lt;section&gt;&lt;div id=&quot;camera&quot;&gt;&lt;/div&gt;&lt;div class=&quot;actions&quot;&gt;&lt;button id=&quot;start&quot;&gt;Start camera&lt;/button&gt;&lt;button id=&quot;stop&quot; disabled&gt;Stop camera&lt;/button&gt;&lt;/div&gt;&lt;p id=&quot;status&quot; role=&quot;status&quot;&gt;Start the camera when you are ready.&lt;/p&gt;&lt;div class=&quot;card&quot;&gt;&lt;small&gt;MODEL PREDICTION&lt;/small&gt;&lt;strong id=&quot;result&quot;&gt;No prediction yet&lt;/strong&gt;&lt;div id=&quot;scores&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;/section&gt;
+  &lt;aside&gt;&lt;section class=&quot;card&quot;&gt;&lt;small&gt;01 / COLLECT&lt;/small&gt;&lt;h2&gt;Define your labels&lt;/h2&gt;&lt;p&gt;Start with a neutral state and one expression, gesture or object.&lt;/p&gt;
+  &lt;div class=&quot;class-card&quot;&gt;&lt;label for=&quot;label-a&quot;&gt;Label A&lt;/label&gt;&lt;input id=&quot;label-a&quot; value=&quot;neutral&quot; maxlength=&quot;40&quot;&gt;&lt;button id=&quot;add-a&quot; disabled&gt;Add example A &lt;b id=&quot;count-a&quot;&gt;0&lt;/b&gt;&lt;/button&gt;&lt;/div&gt;
+  &lt;div class=&quot;class-card&quot;&gt;&lt;label for=&quot;label-b&quot;&gt;Label B&lt;/label&gt;&lt;input id=&quot;label-b&quot; value=&quot;smiling&quot; maxlength=&quot;40&quot;&gt;&lt;button id=&quot;add-b&quot; disabled&gt;Add example B &lt;b id=&quot;count-b&quot;&gt;0&lt;/b&gt;&lt;/button&gt;&lt;/div&gt;
+  &lt;p class=&quot;note&quot;&gt;One click = one example. Add at least 10 per label. Vary pose and distance; keep class sizes similar. Labels lock after the first capture.&lt;/p&gt;&lt;/section&gt;
+  &lt;section class=&quot;card&quot;&gt;&lt;small&gt;02 / TRAIN + TEST&lt;/small&gt;&lt;h2&gt;Try new examples&lt;/h2&gt;&lt;div class=&quot;actions&quot;&gt;&lt;button id=&quot;train&quot; disabled&gt;Train model&lt;/button&gt;&lt;button id=&quot;test&quot; disabled&gt;Start testing&lt;/button&gt;&lt;/div&gt;&lt;button id=&quot;reset&quot;&gt;Reset experiment&lt;/button&gt;&lt;/section&gt;&lt;/aside&gt;&lt;/div&gt;
+  &lt;footer&gt;&lt;h2&gt;What did the model actually learn?&lt;/h2&gt;&lt;p&gt;Change the background. Try another person. Is it learning your pattern, or something else in the image?&lt;/p&gt;&lt;p class=&quot;note&quot;&gt;MobileNet supplies pretrained features; your examples train a classifier. The whole image contributes. Labels do not establish internal feelings. Images stay in this browser. Reset or reload clears the experiment.&lt;/p&gt;&lt;/footer&gt;`);
+  createCanvas(640,480).parent(&#x27;camera&#x27;);video=createVideo([]);video.hide();
+  $(&#x27;#start&#x27;).onclick=startCamera;$(&#x27;#stop&#x27;).onclick=stopCamera;
+  $(&#x27;#add-a&#x27;).onclick=()=&gt;addExample(0);$(&#x27;#add-b&#x27;).onclick=()=&gt;addExample(1);
+  $(&#x27;#train&#x27;).onclick=trainModel;$(&#x27;#test&#x27;).onclick=()=&gt;{testing=!testing;generation++;buttons();if(testing)predict(generation);};
+  $(&#x27;#reset&#x27;).onclick=()=&gt;{stopCamera();location.reload();};window.addEventListener(&#x27;pagehide&#x27;,stopCamera);
+}
+function draw(){
+  background(&#x27;#efefec&#x27;);
+  if(running&amp;&amp;video.elt.readyState&gt;=2){push();translate(width,0);scale(-1,1);image(video,0,0,width,height);pop();}
+  else{fill(&#x27;#777&#x27;);noStroke();textSize(18);textAlign(CENTER,CENTER);text(&#x27;Your camera preview&#x27;,width/2,height/2);}
+}
+async function loadFeatures(){
+  if(classifier)return;
+  if(!loading)loading=(async()=&gt;{
+    if(!window.ml5?.featureExtractor)await new Promise((resolve,reject)=&gt;{const s=document.createElement(&#x27;script&#x27;);s.src=&#x27;https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js&#x27;;s.onload=resolve;s.onerror=()=&gt;reject(new Error(&#x27;Could not load ml5. Check your connection.&#x27;));document.head.append(s);});
+    await new Promise((resolve,reject)=&gt;{const timer=setTimeout(()=&gt;reject(new Error(&#x27;MobileNet download timed out. Reset and retry.&#x27;)),120000);features=ml5.featureExtractor(&#x27;MobileNet&#x27;,()=&gt;{clearTimeout(timer);resolve();});features.ready?.catch(e=&gt;{clearTimeout(timer);reject(e);});});
+    classifier=features.classification(video,{numLabels:2});
+  })().catch(e=&gt;{loading=null;throw e;});await loading;
+}
+async function startCamera(){
+  if(starting||running)return;starting=true;buttons();say(&#x27;Requesting camera...&#x27;);
+  try{const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480}},audio:false});video.elt.srcObject=stream;video.elt.muted=true;video.elt.playsInline=true;await video.elt.play();running=true;
+    const w=video.elt.videoWidth||640,h=video.elt.videoHeight||480;video.size(w,h);resizeCanvas(w,h);say(&#x27;Loading MobileNet image features...&#x27;);await loadFeatures();say(&#x27;Ready. Add at least 10 varied examples to each label.&#x27;);
+  }catch(e){stopCamera();say(e.message+&#x27; Use HTTPS and allow camera access.&#x27;);}finally{starting=false;buttons();}
+}
+function buttons(){
+  $(&#x27;#start&#x27;).disabled=running||starting;$(&#x27;#stop&#x27;).disabled=!running||starting||training||busy;
+  $(&#x27;#add-a&#x27;).disabled=$(&#x27;#add-b&#x27;).disabled=!classifier||!running||starting||busy||training||testing;
+  $(&#x27;#train&#x27;).disabled=!running||starting||busy||training||testing||counts.some(n=&gt;n&lt;10);
+  $(&#x27;#test&#x27;).disabled=!trained||!running||training||busy;$(&#x27;#test&#x27;).textContent=testing?&#x27;Pause testing&#x27;:&#x27;Start testing&#x27;;
+  $(&#x27;#label-a&#x27;).disabled=$(&#x27;#label-b&#x27;).disabled=counts.some(n=&gt;n&gt;0);$(&#x27;#reset&#x27;).disabled=training||busy||starting;
+}
+async function addExample(index){
+  const names=labels();if(!names[0]||!names[1]||names[0].toLowerCase()===names[1].toLowerCase()){say(&#x27;Choose two different, nonempty labels.&#x27;);return;}
+  if(!running||busy||training||testing)return;busy=true;buttons();
+  try{await classifier.addImage(names[index]);counts[index]++;trained=false;$(&#x27;#count-a&#x27;).textContent=counts[0];$(&#x27;#count-b&#x27;).textContent=counts[1];say(&#x27;Examples: &#x27;+names[0]+&#x27; &#x27;+counts[0]+&#x27; / &#x27;+names[1]+&#x27; &#x27;+counts[1]+&#x27;.&#x27;);$(&#x27;#result&#x27;).textContent=&#x27;Train with your latest examples&#x27;;$(&#x27;#scores&#x27;).replaceChildren();}
+  catch(e){say(&#x27;Capture failed: &#x27;+e.message);}finally{busy=false;buttons();}
+}
+function trainModel(){
+  training=true;buttons();say(&#x27;Training your classifier...&#x27;);
+  const fail=e=&gt;{training=false;trained=false;say(&#x27;Training failed: &#x27;+e.message);buttons();};
+  try{const task=classifier.train(loss=&gt;{if(loss!=null)say(&#x27;Training / loss &#x27;+Number(loss).toFixed(4));else{training=false;trained=true;say(&#x27;Training complete. Test examples it has not seen.&#x27;);buttons();}});task?.catch(fail);}catch(e){fail(e);}
+}
+function predict(token){
+  if(!testing||!running||token!==generation)return;
+  classifier.classify((error,results)=&gt;{
+    if(!testing||!running||token!==generation)return;
+    if(error||!results?.length){testing=false;say(&#x27;Prediction failed. Try training again.&#x27;);buttons();return;}
+    const best=results.reduce((a,b)=&gt;a.confidence&gt;b.confidence?a:b);$(&#x27;#result&#x27;).textContent=best.label+&#x27; / &#x27;+Math.round(best.confidence*100)+&#x27;%&#x27;;$(&#x27;#scores&#x27;).replaceChildren();
+    labels().forEach(name=&gt;{const score=results.find(r=&gt;r.label===name)?.confidence||0,row=document.createElement(&#x27;div&#x27;),label=document.createElement(&#x27;span&#x27;),value=document.createElement(&#x27;b&#x27;),track=document.createElement(&#x27;div&#x27;),bar=document.createElement(&#x27;i&#x27;);row.className=&#x27;score-row&#x27;;label.textContent=name;value.textContent=Math.round(score*100)+&#x27;%&#x27;;track.className=&#x27;track&#x27;;bar.style.width=score*100+&#x27;%&#x27;;track.append(bar);row.append(label,value,track);$(&#x27;#scores&#x27;).append(row);});setTimeout(()=&gt;predict(token),180);
+  });
+}
+function stopCamera(){running=false;testing=false;generation++;video?.elt.srcObject?.getTracks().forEach(t=&gt;t.stop());if(video)video.elt.srcObject=null;if($(&#x27;#status&#x27;)){say(&#x27;Camera off. Examples remain until reset or reload.&#x27;);buttons();}}
+const TRAIN_STYLE=`
+html,body{margin:0;padding:0;background:#f4f4f0;color:#171717;font:14px/1.5 Arial,sans-serif;color-scheme:light}#train-app,#train-app *{box-sizing:border-box}#train-app{max-width:1100px;margin:auto;padding:28px clamp(16px,4vw,44px)}
+#train-app header{border-bottom:1px solid #ccc;padding-bottom:20px;margin-bottom:24px}#train-app small{font-size:10px;font-weight:700;letter-spacing:.1em;color:#666}#train-app h1{font-size:clamp(30px,5vw,54px);line-height:1;letter-spacing:-.055em;margin:15px 0}#train-app h2{font-size:21px;line-height:1.15;letter-spacing:-.035em;margin:10px 0}#train-app p{margin:10px 0}
+.workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr);gap:24px;align-items:start}#train-app #camera{background:#efefec;border:1px solid #ddd}#train-app canvas{display:block;width:100%!important;height:auto!important}#train-app video{display:none!important}
+#train-app button,#train-app input{font:inherit;color:#171717;background:white;border:1px solid #bbb;border-radius:5px;padding:9px 12px}#train-app button{cursor:pointer}#train-app button:hover:enabled{background:#eee;border-color:#171717}#train-app button:disabled{opacity:.4;cursor:default}#train-app :focus-visible{outline:2px solid #3159e6;outline-offset:3px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}#train-app #status{font-size:12px;min-height:36px;color:#555}.card{background:white;border:1px solid #ddd;border-radius:8px;padding:18px;margin-bottom:16px}.card&gt;p{font-size:12px;color:#555}
+.class-card{border-top:1px solid #eee;padding-top:12px;margin-top:14px;display:grid;grid-template-columns:1fr auto;gap:8px}.class-card label{grid-column:1/-1;font-size:11px;font-weight:bold}.class-card input{min-width:0;width:100%}.class-card button{font-size:12px!important}.class-card b{margin-left:5px;font-variant-numeric:tabular-nums}
+.track{background:#eee;height:4px;grid-column:1/-1;overflow:hidden;border-radius:5px}.track i{display:block;background:#3159e6;height:100%;width:0;transition:width .2s}#train-app #result{display:block;font-size:clamp(23px,3vw,36px);letter-spacing:-.04em;overflow-wrap:anywhere;margin:8px 0 14px}.score-row{display:grid;grid-template-columns:1fr auto;gap:5px;font-size:12px;margin:12px 0}#train-app #reset{font-size:11px;padding:0;background:none;border:0;text-decoration:underline}.note{font-size:11px!important;color:#666;line-height:1.5}#train-app footer{border-top:1px solid #ccc;padding-top:16px;margin-top:20px;max-width:760px}#train-app footer h2{font-size:18px}@media(max-width:650px){.workspace{grid-template-columns:1fr}#train-app{padding:20px 14px}}@media(prefers-reduced-motion:reduce){.track i{transition:none}}`;
+</pre></body></html>

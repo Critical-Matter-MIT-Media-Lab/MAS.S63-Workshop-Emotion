@@ -37,21 +37,31 @@ python -m http.server 8000 --bind 127.0.0.1
 
 Open:
 
-- **Observe:** http://localhost:8000/resources/p5-expression/
+- **Observe:** http://localhost:8000/resources/p5-expression/editor.html
 - **Teachable Machine in p5.js:** http://localhost:8000/resources/teachable-p5/
 - **Optional ml5 training exercise:** http://localhost:8000/resources/p5-train/
 
-Use Chrome or Edge and explicitly allow the camera. Model downloads need internet access. Both examples pin p5.js **1.11.3**. The trainable example pins ml5.js **0.12.2**. The expression example uses the same expression-enabled ml5 teaching build (`ml5js/Intro-ML-Arts-IMA@ml5-build-10-7-19`) as Jake’s original sketch. The standard ml5 0.12.2 FaceAPI wrapper omits expression support, so these two examples intentionally use different builds. Libraries load from jsDelivr. Do not replace it with latest without migrating both sketches. No npm installation is required.
+Use Chrome or Edge and explicitly allow the camera. Model downloads need internet access. The standalone examples pin p5.js **1.11.3**. The trainable example pins ml5.js **0.12.2**. The expression example uses the same expression-enabled ml5 teaching build (`ml5js/Intro-ML-Arts-IMA@ml5-build-10-7-19`) as Jake’s original sketch. The standard ml5 0.12.2 FaceAPI wrapper omits expression support, so these two examples intentionally use different builds. Libraries load from jsDelivr. Do not replace it with latest without migrating both sketches. No npm installation is required.
 
-Camera images, photo textures, and captured comparison examples stay in browser memory. Refreshing clears them. No expression entries are recorded. Stop the camera when done. The expression demo can optionally send numeric scores and labels to the local TouchDesigner receiver.
+Camera images, photo textures, and captured comparison examples stay in browser memory. Refreshing clears them. No expression entries are recorded. Stop the camera when done. The p5 editor examples are independent of the separate TouchDesigner project.
 
 ## 1. Observe a pretrained model
 
-Start the camera in `p5-expression`. FaceAPI returns seven expression scores. Try changing your pose, lighting, or expression. Move out of frame and observe the scores clear. This is inference with an already-trained model.
+Start the camera in `p5-expression/editor.html`. FaceAPI returns seven expression scores. Try changing your pose, lighting, or expression. Move out of frame and observe the scores clear. This is inference with an already-trained model.
 
 Simplified from [Jake’s original p5.js sketch](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): removes serial/Arduino, face descriptors and landmark drawing. The workshop version adds a tracked face square with a live expression label.
 
 To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.html`, its `presenter.css`, and the shared `bridge.js` and `live-ui.js`. Put them in the sketch root and change all `../shared/` references in the HTML to `./`. The sketches use p5 global mode and are also editable directly here.
+
+## p5.js editor collection
+
+Open [MAS.S63 Fall 2026](https://editor.p5js.org/jxke/collections/GLRMQuOpc) for all three editable p5.js examples:
+
+- [Train + Test Your Model](https://editor.p5js.org/jxke/sketches/_APDBCYwRn): collect two classes, train and test, entirely in the browser. The interface and styles are included in sketch.js; see [the guide](resources/p5-train/README.md).
+- [ML5.js Model Loader](https://editor.p5js.org/jxke/sketches/LwdqIYxBg): load your exported Teachable Machine image model.
+- [ML5 Facial Emotion Recognition](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): inspect the existing pretrained expression classifier. Its self-contained source is [editor-sketch.js](resources/p5-expression/editor-sketch.js), with a [standalone preview](resources/p5-expression/editor.html).
+
+These p5.js examples have their own interfaces and do not need a TouchDesigner connection. The separate TouchDesigner project remains available below.
 
 ## 2. Teachable Machine to p5.js
 
@@ -73,14 +83,14 @@ The mesh is a separate geometric representation. The expression classifier reads
 
 Canonical geometry and the landmark model are from Google's MediaPipe project. See the included `MEDIAPIPE-LICENSE` and [face lab guide](resources/face-lab/README.md).
 
-## Optional: train inside ml5.js
+## Optional: train and test inside p5.js
 
 1. Open `p5-train` and start the camera.
 2. Define two different labels. The defaults are `calm` and `energized`. Decide together what visible evidence should support each label.
 3. Click **Add example A** at least 10 times, varying your pose. Do the same for B. Keep examples balanced. Each click captures one frame. Labels lock after the first capture.
 4. Press **Train model** and wait for completion.
 5. Press **Start testing**. Try new poses and backgrounds, or ask a consenting partner to test.
-6. Pause, add examples, and train again. Use **Reset experiment** to clear examples or change labels. After stopping the camera, reset before starting a fresh experiment.
+6. Pause, add examples, and train again. Use **Reset experiment** to clear examples or change labels. Stopping and restarting the camera preserves the current examples and trained classifier.
 
 MobileNet supplies pretrained image features. You train a new classifier on top of those features, a process called transfer learning. The full camera frame contributes to the prediction, including background and clothing. The model is learning your visual examples, not directly measuring internal feelings.
 

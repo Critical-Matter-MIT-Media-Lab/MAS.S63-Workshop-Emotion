@@ -1,0 +1,3 @@
+/* Full styles are also embedded in sketch.js for the p5.js editor. */
+html,body{margin:0;padding:0;background:#f4f4f0;color:#171717;font:14px/1.5 Arial,sans-serif;color-scheme:light}
+canvas{display:block;max-width:100%;height:auto!important}
