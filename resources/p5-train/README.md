@@ -1,6 +1,6 @@
 # Train + test in p5.js
 
-Open [the training sketch](https://editor.p5js.org/jxke/sketches/_APDBCYwRn), or serve this folder over localhost/HTTPS. Paste the complete sketch.js into a p5.js 1.x project. It includes its interface, styles and ml5 0.12.2 loader; no shared workshop files are required.
+Open [the training sketch](https://editor.p5js.org/jxke/sketches/_APDBCYwRn), or serve this folder over localhost/HTTPS. Use the three matching files in a p5.js 1.x project: index.html defines the interface and imports libraries, style.css handles appearance, and sketch.js handles the camera, training and predictions. No shared workshop files are required. [Copy the project files](copy.html).
 
 1. Start the camera and wait for MobileNet.
 2. Define two labels. Add at least ten varied examples per class, keeping class sizes similar.

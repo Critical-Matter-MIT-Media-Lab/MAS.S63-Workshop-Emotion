@@ -1,37 +1,22 @@
 // ML5 Model Loader Sketch / custom Teachable Machine image models.
-// In the p5 editor, replace all of sketch.js with this file.
-// Paste your exported URL on the next line. No extra script tags are needed.
+// Use with index.html and style.css from the model loader guide.
+// Paste your exported model URL on the next line.
 const MODEL_URL = 'PASTE_YOUR_TEACHABLE_MACHINE_MODEL_URL_HERE/';
 let model, video, ready = false, starting = false, generation = 0, message;
 const modelInput = document.createElement('canvas');
 modelInput.width = modelInput.height = 224;
 function setup() {
-  const style = document.createElement('style');
-  style.textContent = `#affective-loader{font:14px/1.4 Arial,sans-serif;color:#171717;background:#fff;border:1px solid #d6d6d6;border-radius:10px;overflow:hidden;width:min(640px,calc(100% - 32px));margin:16px;box-sizing:border-box}#affective-loader canvas{display:block;width:100%!important;height:auto!important;max-height:calc(100dvh - 210px);object-fit:contain;background:#eee}#affective-loader .loader-toolbar{padding:12px 14px;display:flex;gap:8px;align-items:center;background:#f6f6f6}#affective-loader button{font:12px Arial,sans-serif;color:#171717;background:#fff;border:1px solid #bbb;border-radius:5px;padding:7px 10px;cursor:pointer}#affective-loader .loader-readout{color:#171717!important;background:#fff!important;font-size:16px;font-weight:600;padding:14px 16px;margin:0;min-height:48px;overflow-wrap:anywhere;box-sizing:border-box}#affective-loader .loader-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#555;padding:12px 16px;margin:0;border-bottom:1px solid #ddd}`;
-  document.head.append(style);
-  const shell = createDiv().id('affective-loader');
-  createP('Your image model / live webcam').class('loader-heading').parent(shell);
-  createCanvas(640,480).parent(shell);
-  message = createP('Paste MODEL_URL above, then start the camera.').class('loader-readout').parent(shell);
-  message.elt.setAttribute('role','status');
-  const toolbar = createDiv().class('loader-toolbar').parent(shell);
-  createButton('Start camera').parent(toolbar).mousePressed(startModel);
-  createButton('Stop camera').parent(toolbar).mousePressed(stopModel);
+  createCanvas(640,480).parent('loader-camera');
+  message = select('#loader-message');
+  select('#loader-start').mousePressed(startModel);
+  select('#loader-stop').mousePressed(stopModel);
 }
-function loadLibrary(url) {
-  return new Promise((resolve,reject) => {
-    const script = document.createElement('script');script.src = url;
-    script.onload = resolve;script.onerror = () => reject(new Error('Could not load '+url));
-    document.head.append(script);
-  });
-}
+
 async function startModel() {
   if (ready || starting) return;
   const token = ++generation;starting = true;
   try {
     message.html('Loading model libraries…');
-    if (!window.tf) await loadLibrary('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js');
-    if (!window.tmImage) await loadLibrary('https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.3/dist/teachablemachine-image.min.js');
     if (MODEL_URL.includes('PASTE_')) throw new Error('Replace MODEL_URL near the top of sketch.js.');
     const base = MODEL_URL.replace(/\/+$/,'')+'/';
     if (!model) model = await window.tmImage.load(base+'model.json',base+'metadata.json');

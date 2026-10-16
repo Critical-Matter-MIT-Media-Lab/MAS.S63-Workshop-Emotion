@@ -51,21 +51,21 @@ Start the camera in `p5-expression/editor.html`. FaceAPI returns seven expressio
 
 Simplified from [Jake’s original p5.js sketch](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): removes serial/Arduino, face descriptors and landmark drawing. The workshop version adds a tracked face square with a live expression label.
 
-To edit in the p5 editor, create a new sketch and upload `sketch.js`, `index.html`, its `presenter.css`, and the shared `bridge.js` and `live-ui.js`. Put them in the sketch root and change all `../shared/` references in the HTML to `./`. The sketches use p5 global mode and are also editable directly here.
+Use the p5 editor links below, or copy the HTML, CSS and JavaScript files from each example guide into their matching editor tabs. HTML defines the interface and library imports, CSS handles styling, and JavaScript handles the camera and model logic.
 
 ## p5.js editor collection
 
 Open [MAS.S63 Fall 2026](https://editor.p5js.org/jxke/collections/GLRMQuOpc) for all three editable p5.js examples:
 
-- [Train + Test Your Model](https://editor.p5js.org/jxke/sketches/_APDBCYwRn): collect two classes, train and test, entirely in the browser. The interface and styles are included in sketch.js; see [the guide](resources/p5-train/README.md).
+- [Train + Test Your Model](https://editor.p5js.org/jxke/sketches/_APDBCYwRn): collect two classes, train and test, entirely in the browser. HTML, CSS and JavaScript are separate files; see [the guide](resources/p5-train/README.md).
 - [ML5.js Model Loader](https://editor.p5js.org/jxke/sketches/LwdqIYxBg): load your exported Teachable Machine image model.
-- [ML5 Facial Emotion Recognition](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): inspect the existing pretrained expression classifier. Its self-contained source is [editor-sketch.js](resources/p5-expression/editor-sketch.js), with a [standalone preview](resources/p5-expression/editor.html).
+- [ML5 Facial Emotion Recognition](https://editor.p5js.org/jxke/sketches/AM8KwbKvK): inspect the existing pretrained expression classifier. Its JavaScript source is [editor-sketch.js](resources/p5-expression/editor-sketch.js), with a [standalone preview](resources/p5-expression/editor.html).
 
 These p5.js examples have their own interfaces and do not need a TouchDesigner connection. The separate TouchDesigner project remains available below.
 
 ## 2. Teachable Machine to p5.js
 
-Follow [the Teachable Machine guide](resources/teachable-p5/README.md). The [complete minimal sketch](resources/teachable-p5/minimal-sketch.md) loads its model libraries automatically and can be copied directly into sketch.js in the p5 editor.
+Follow [the Teachable Machine guide](resources/teachable-p5/README.md). The [model loader guide](resources/teachable-p5/minimal-sketch.md) includes the three project files for the p5 editor.
 
 The presentation keeps one camera feed alive. It is large on slides 7 and 12, and moves to the bottom-right corner on other slides while running. Loading your Teachable Machine model replaces the predictions on that same feed. The face square continues to track geometry while your model supplies the labels. Select the pretrained model button to switch back.
 

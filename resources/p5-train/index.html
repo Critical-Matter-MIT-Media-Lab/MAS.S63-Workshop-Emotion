@@ -1,1 +1,24 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Train + Test / Affective Sensing</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script></head><body><script src="sketch.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Train + Test / Affective Sensing</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
+  <script defer src="sketch.js"></script>
+</head>
+<body>
+<main id="train-app">
+<header><small>AFFECTIVE SENSING / P5.JS + ML5.JS</small><h1>Train. Test. Question.</h1><p>Name two visible patterns. Collect examples, train a model, then test something new.</p></header>
+  <div class="workspace"><section><div id="camera"></div><div class="actions"><button id="start">Start camera</button><button id="stop" disabled>Stop camera</button></div><p id="status" role="status">Start the camera when you are ready.</p><div class="card"><small>MODEL PREDICTION</small><strong id="result">No prediction yet</strong><div id="scores"></div></div></section>
+  <aside><section class="card"><small>01 / COLLECT</small><h2>Define your labels</h2><p>Start with a neutral state and one expression, gesture or object.</p>
+  <div class="class-card"><label for="label-a">Label A</label><input id="label-a" value="neutral" maxlength="40"><button id="add-a" disabled>Add example A <b id="count-a">0</b></button></div>
+  <div class="class-card"><label for="label-b">Label B</label><input id="label-b" value="smiling" maxlength="40"><button id="add-b" disabled>Add example B <b id="count-b">0</b></button></div>
+  <p class="note">One click = one example. Add at least 10 per label. Vary pose and distance; keep class sizes similar. Labels lock after the first capture.</p></section>
+  <section class="card"><small>02 / TRAIN + TEST</small><h2>Try new examples</h2><div class="actions"><button id="train" disabled>Train model</button><button id="test" disabled>Start testing</button></div><button id="reset">Reset experiment</button></section></aside></div>
+  <footer><h2>What did the model actually learn?</h2><p>Change the background. Try another person. Is it learning your pattern, or something else in the image?</p><p class="note">MobileNet supplies pretrained features; your examples train a classifier. The whole image contributes. Labels do not establish internal feelings. Images stay in this browser. Reset or reload clears the experiment.</p></footer>
+</main>
+</body>
+</html>

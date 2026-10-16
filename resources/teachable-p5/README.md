@@ -8,7 +8,7 @@
 
 ## Build your own sketch
 
-[Read and copy the complete starter](starter.html), or follow the [ML5 Model Loader Sketch guide](minimal-sketch.md). The full JavaScript is also in [starter-sketch.js](starter-sketch.js). Paste it into a new p5 editor sketch.js and replace the quoted value of const MODEL_URL near the top. The canvas shows the full webcam at 640 × 480, adapting to the actual camera aspect ratio. Only model inference uses a separate square crop. It loads the TensorFlow.js and Teachable Machine libraries automatically; no additional script tags are required. For local use, open minimal-index.html through a localhost server.
+[Read and copy the three project files](starter.html), or follow the [ML5 Model Loader Sketch guide](minimal-sketch.md). Copy each file into its matching p5 editor tab: index.html, style.css and sketch.js. Set const MODEL_URL near the top of sketch.js. HTML loads the libraries and defines the controls; CSS styles the page; JavaScript handles the camera and predictions. The canvas shows the full webcam at its native aspect ratio; only model inference uses a square crop. For local use, open minimal-index.html through a localhost server.
 
 The live demo uses p5.js 1.11.3, TensorFlow.js 1.3.1 and @teachablemachine/image 0.8.3. The model provides its own class names. Camera frames stay in memory; there are no expression counters or recordings. Only the model URL is remembered for the current browser session.
 

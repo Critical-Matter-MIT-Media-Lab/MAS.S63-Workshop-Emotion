@@ -1,1 +1,17 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reading expressions / p5.js</title><script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script></head><body><script src="editor-sketch.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reading expressions / p5.js</title>
+  <link rel="stylesheet" href="editor-style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/gh/ml5js/Intro-ML-Arts-IMA@ml5-build-10-7-19/ml5_build/ml5.min.js"></script>
+  <script defer src="editor-sketch.js"></script>
+</head>
+<body>
+<main id="expression-app">
+<header><small>AFFECTIVE SENSING / P5.JS + ML5.JS</small><h1>Reading expressions</h1><p>Watch a pretrained model assign labels to visible facial patterns.</p></header><div class="expression-layout"><section><div id="camera"></div><div class="actions"><button id="start">Start camera</button><button id="stop" disabled>Stop camera</button></div><p id="status" role="status">Camera off. Start when you are ready.</p></section><aside><small>MODEL PREDICTION</small><h2 id="result">No prediction yet</h2><div id="scores"></div><p class="note">These scores describe the model's categories. A smiling face does not necessarily mean a happy person.</p></aside></div><footer>Images stay in this browser. This model was trained previously; your camera does not retrain it.</footer>
+</main>
+</body>
+</html>
